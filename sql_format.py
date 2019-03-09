@@ -1,7 +1,7 @@
 # encoding=utf-8
 
 """
-格式默认TAB是4个空格
+20190309 wq 增加对 join/from等后面直接跟左括号的修复：1.分割sql时的无法识别 2.左括号前增加空格
 """
 
 import re
@@ -14,7 +14,7 @@ def sql_split(sql):
     :return:
     """
     # 分割sql, 结尾加\s 防止将非关键字给分割了 例如pdw_fact_person_insure中的on
-    split_sql = re.findall(r'((with.*?\(|[^,]*as\s*\(|select|from|((left|right|full|inner)\s)?join|on|where|group|order|limit|having|union|insert|create)\s.*?(?=([^,]*as\s*\(|select|from|((left|right|full|inner)\s)?join|on|where|group|order|limit|having|union|insert|create)\s|$))', sql)
+    split_sql = re.findall(r'((with.*?\(|[^,]*as\s*\(|select|from|((left|right|full|inner)\s)?join\(?|on|where|group|order|limit|having|union|insert|create)\s.*?(?=([^,]*as\s*\(|select|from|((left|right|full|inner)\s)?join\(?|on|where|group|order|limit|having|union|insert|create)\s|$))', sql)
     split_sql_list = [split_sql_value[0].lstrip() for split_sql_value in split_sql]
     # 消除窗口函数中order的影响
     split_sql_list_pos = 0
@@ -82,7 +82,7 @@ def sql_split(sql):
                 exec_sql[exec_sql_pos] = tmp
             else:
                 if first_value != ')':
-                    exec_sql[exec_sql_pos] = re.sub('^\s*(\w*)\s*', first_value.rjust(6) + 2 * " ", exec_sql[exec_sql_pos])
+                    exec_sql[exec_sql_pos] = re.sub('^\s*(\w*)\s*', first_value.rjust(6) + 2 * " ", re.sub('\s*\(', ' (', exec_sql[exec_sql_pos]))
                 else:
                     # exec_sql[exec_sql_pos] = 8 * " " + exec_sql[exec_sql_pos]
                     pass
@@ -133,3 +133,24 @@ def sql_format(sql):
         else:
             pass
     return result_sql
+
+
+# exec_sql = [
+#     """
+# select 123 --,123
+#        ,sdfdsfsd
+#                ,sdfdsfds,
+#              sdfd --fd,sdfds
+#  from sfdsfds
+#     """
+# ]
+# for exec_sql_vaule in exec_sql:
+#     print(exec_sql_vaule)
+#     print("------------------------无情分割线-----------------------")
+#     format_sql = sql_format(exec_sql_vaule)
+#     print(format_sql)
+
+
+
+
+
