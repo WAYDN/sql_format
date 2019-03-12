@@ -2,6 +2,7 @@
 
 """
 20190309 wq 增加对 join/from等后面直接跟左括号的修复：1.分割sql时的无法识别 2.左括号前增加空格
+20190312 wq 修复<>的处理。对 join/from等后面直接跟左括号的进一步修复
 """
 
 import re
@@ -14,11 +15,11 @@ def sql_split(sql):
     :return:
     """
     # 分割sql, 结尾加\s 防止将非关键字给分割了 例如pdw_fact_person_insure中的on
-    split_sql = re.findall(r'((with.*?\(|[^,]*as\s*\(|select|from|((left|right|full|inner)\s)?join\(?|on|where|group|order|limit|having|union|insert|create)\s.*?(?=([^,]*as\s*\(|select|from|((left|right|full|inner)\s)?join\(?|on|where|group|order|limit|having|union|insert|create)\s|$))', sql)
+    split_sql = re.findall(r'((with.*?\(|[^,]*as\s*\(|select|from|((left|right|full|inner)\s)?join|on|where|group|order|limit|having|union|insert|create)\s.*?(?=([^,]*as\s*\(|select|from|((left|right|full|inner)\s)?join\(?|on|where|group|order|limit|having|union|insert|create)\s|$))', sql)
     split_sql_list = [split_sql_value[0].lstrip() for split_sql_value in split_sql]
     # 消除窗口函数中order的影响
     split_sql_list_pos = 0
-    while split_sql_list_pos < len(split_sql_list) and len(split_sql_list) > 1:
+    while split_sql_list_pos < len(split_sql_list)-1 and len(split_sql_list) > 1:
         if re.search('^select', split_sql_list[split_sql_list_pos]) and not re.search('^from', split_sql_list[split_sql_list_pos+1]):
             split_sql_list[split_sql_list_pos] = split_sql_list[split_sql_list_pos] + ' ' + split_sql_list[split_sql_list_pos+1]
             split_sql_list.pop(split_sql_list_pos+1)
@@ -118,8 +119,10 @@ def sql_format(sql):
                 else:
                     pass
                 tmp_sql[tmp_result_sql_pos] = re.sub(pattern, repl_str, tmp_sql[tmp_result_sql_pos])
-                tmp_sql[tmp_result_sql_pos] = tmp_sql[tmp_result_sql_pos].replace('> =', '>=').replace('< =', '<=').replace('-  - ', '--')
+            tmp_sql[tmp_result_sql_pos] = tmp_sql[tmp_result_sql_pos].replace('> =', '>=').replace('< =', '<=').replace('-  - ', '--').replace('! =', '!=').replace('< >', '<>')
     tmp_sql = ''.join(tmp_sql)
+    # 20190312
+    tmp_sql = re.sub('(((?<=\sas)|(?<=\sselect)|(?<=\sfrom)|(?<=\sjoin)|(?<=\son)|(?<=\swhere)|(?<=\sby)|(?<=\slimit)|(?<=\shaving)|(?<=\sunion)|(?<=\sinsert)|(?<=\screate))\()', ' (', tmp_sql)
     # 按括号添加前缀空格
     split_sql = sql_split(tmp_sql)
     for split_sql_value in split_sql:
@@ -137,11 +140,7 @@ def sql_format(sql):
 
 # exec_sql = [
 #     """
-# select 123 --,123
-#        ,sdfdsfsd
-#                ,sdfdsfds,
-#              sdfd --fd,sdfds
-#  from sfdsfds
+# select(1.0/2)*3 from(select 123)
 #     """
 # ]
 # for exec_sql_vaule in exec_sql:
