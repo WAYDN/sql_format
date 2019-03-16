@@ -1,12 +1,14 @@
 # encoding=utf-8
 
 """
-20190309 wq 增加对 join/from等后面直接跟左括号的修复：1.分割sql时的无法识别 2.左括号前增加空格
-20190312 wq 修复<>的处理。对 join/from等后面直接跟左括号的进一步修复
+20190309 wq 增加对 join/from等后面直接跟左括号的修复：1.分割sql时的无法识别 2.左括号前增加空格 (1.3)
+20190312 wq 修复<>的处理。对 join/from等后面直接跟左括号的进一步修复 (1.4)
+20190316 wq 1.增加对注释字段的处理 2.修改 case when...end改为同行显示 (1.5)
 """
 
 import re
 from common import common_func
+import random
 
 def sql_split(sql):
     """
@@ -15,7 +17,7 @@ def sql_split(sql):
     :return:
     """
     # 分割sql, 结尾加\s 防止将非关键字给分割了 例如pdw_fact_person_insure中的on
-    split_sql = re.findall(r'((with.*?\(|[^,]*as\s*\(|select|from|((left|right|full|inner)\s)?join|on|where|group|order|limit|having|union|insert|create)\s.*?(?=([^,]*as\s*\(|select|from|((left|right|full|inner)\s)?join\(?|on|where|group|order|limit|having|union|insert|create)\s|$))', sql)
+    split_sql = re.findall(r'((^\s*--[^\s]*|with.*?\(|[^,]*as\s*\(|select|from|((left|right|full|inner)\s)?join|on|where|group|order|limit|having|union|insert|create)\s.*?(?=([^,]*as\s*\(|select|from|((left|right|full|inner)\s)?join\(?|on|where|group|order|limit|having|union|insert|create)\s|$))', sql)
     split_sql_list = [split_sql_value[0].lstrip() for split_sql_value in split_sql]
     # 消除窗口函数中order的影响
     split_sql_list_pos = 0
@@ -40,7 +42,7 @@ def sql_split(sql):
         # 分割 sql中的‘字段’和‘逻辑判断条件’；并根据关键字添加空格
         for exec_sql_pos in range(len(exec_sql)):
             exec_sql_value = exec_sql[exec_sql_pos].strip()
-            first_value = re.match(r'^\s*(\w+|\))\s?', exec_sql_value).group(1)
+            first_value = re.match(r'^\s*((--)?\w+|\))\s?', exec_sql_value).group(1)
             if first_value in ('select', 'group', 'order'):
                 # 分割字段，根据','分割出所有字段
                 tmp_sql = [i[0].strip() for i in re.findall('(.*?(,(\s*--[^\s]*)?|$))', exec_sql_value)]
@@ -48,6 +50,7 @@ def sql_split(sql):
                 for tmp_sql_pos in range(len(tmp_sql)):
                     if tmp_sql_pos > 0 and tmp_sql[tmp_sql_pos-1].count('(') != tmp_sql[tmp_sql_pos-1].count(')'):
                         tmp_sql[tmp_sql_pos] = tmp_sql[tmp_sql_pos-1] + ' ' + tmp_sql[tmp_sql_pos]
+                        # 跳过上次括号不等，留到下次合并处理
                         if tmp_sql[tmp_sql_pos].count('(') == tmp_sql[tmp_sql_pos].count(')'):
                             tmp.append(tmp_sql[tmp_sql_pos])
                     elif tmp_sql[tmp_sql_pos].count('(') == tmp_sql[tmp_sql_pos].count(')'):
@@ -62,16 +65,19 @@ def sql_split(sql):
                         tmp[tmp_pos] = 8 * " " + tmp[tmp_pos]
                     # case when 特别处理
                     if re.search('case', tmp[tmp_pos]):
-                        tmp_case = [i[0] for i in re.findall(r'((.*?(case )?when|end).*?(?=(when|end|$)))', tmp[tmp_pos])]
-                        case_pos = 0
-                        for tmp_case_pos in range(len(tmp_case)):
-                            if tmp_case_pos == 0:
-                                case_pos = tmp_case[tmp_case_pos].find('when')
-                            elif tmp_case_pos + 1 == len(tmp_case):
-                                tmp_case[tmp_case_pos] = (case_pos + 1) * ' ' + tmp_case[tmp_case_pos]
-                            else:
-                                tmp_case[tmp_case_pos] = case_pos * ' ' + tmp_case[tmp_case_pos]
-                        tmp[tmp_pos] = tmp_case
+                        tmp_case = [i[0] for i in re.findall(r'((.*?(case )?when|else.{10,}(?=end)|(else.{0,10})?end).*?(?=(when|else.{10,}|(else.{0,10})?end|$)))', tmp[tmp_pos])]
+                        if len(tmp_case) > 2:
+                            case_pos = 0
+                            for tmp_case_pos in range(len(tmp_case)):
+                                if tmp_case_pos == 0:
+                                    case_pos = tmp_case[tmp_case_pos].find('when')
+                                elif re.match('^end', tmp_case[tmp_case_pos]):
+                                    tmp_case[tmp_case_pos] = (case_pos + 1) * ' ' + tmp_case[tmp_case_pos]
+                                else:
+                                    tmp_case[tmp_case_pos] = case_pos * ' ' + tmp_case[tmp_case_pos]
+                            tmp[tmp_pos] = tmp_case
+                        else:
+                            pass
                     else:
                         pass
                 exec_sql[exec_sql_pos] = tmp
@@ -99,8 +105,12 @@ def sql_format(sql):
     """
     level = 0
     result_sql = ''
-    # 去掉注释，避免不规范的注释而导致的错误
-    sql = ' ' + re.sub('\s+', ' ', re.sub('--.*?\n', '', sql)).strip()
+    # 20190316 wq 修复注释问题，先将注释内容取出,映射到一个随机数，等处理完后最后映射回来
+    notes = re.findall('((?<=--).*?)\r\n', sql)
+    notes_encode = ['w' + str(random.randint(1000000, 10000000)) + 'q' for i in notes]
+    for note_pos in range(len(notes)):
+        sql = sql.replace('--' + notes[note_pos], '--' + notes_encode[note_pos])
+    sql = ' ' + re.sub('\s+', ' ', sql).strip()
     # 格式化运算符，关键字转化小写（跳过单引号内的字符串）
     tmp_sql = [i[0] for i in re.findall('((\'.*?\')|([^\']*))', sql)]
     for tmp_result_sql_pos in range(len(tmp_sql)):
@@ -135,21 +145,6 @@ def sql_format(sql):
             level -= 1
         else:
             pass
+    for note_pos in range(len(notes_encode)):
+        result_sql = result_sql.replace(notes_encode[note_pos], notes[note_pos])
     return result_sql
-
-
-# exec_sql = [
-#     """
-# select(1.0/2)*3 from(select 123)
-#     """
-# ]
-# for exec_sql_vaule in exec_sql:
-#     print(exec_sql_vaule)
-#     print("------------------------无情分割线-----------------------")
-#     format_sql = sql_format(exec_sql_vaule)
-#     print(format_sql)
-
-
-
-
-
