@@ -4,7 +4,7 @@
 20190309 wq 增加对 join/from等后面直接跟左括号的修复：1.分割sql时的无法识别 2.左括号前增加空格 (1.3)
 20190312 wq 修复<>的处理。对 join/from等后面直接跟左括号的进一步修复 (1.4)
 20190316 wq 1.增加对注释字段的处理 2.修改 case when...end改为同行显示 (1.5)
-20190318 wq 修复字段名中含关键字错误
+20190319 wq 1.修复字段名中含关键字错误 2.符号后空格问题及中括号被分割问题（1.6）
 """
 
 import re
@@ -19,7 +19,7 @@ def sql_split(sql):
     """
     # 分割sql, 结尾加\s 防止将非关键字给分割了 例如pdw_fact_person_insure中的on
     # 20190318 wq 在关键字前增加\s，防止将非关键字给分割了，例如sql_from中的from
-    split_sql = re.findall(r'((with.*?\(|[^,]*as\s*\(|select|from|((left|right|full|inner)\s)?join|on|where|group|order|limit|having|union|insert|create)\s.*?\s(?=([^,]*as\s*\(|select|from|((left|right|full|inner)\s)?join\(?|on|where|group|order|limit|having|union|insert|create)\s|$))', sql)
+    split_sql = re.findall(r'((with.*?\(|[^,]*as\s*\(|select|from|((left|right|full|inner)\s)?join|on|where|group|order|limit|having|union|insert|create)\s.*?(?=\s*([^,]*as\s*\(|select|from|((left|right|full|inner)\s)?join\(?|on|where|group|order|limit|having|union|insert|create)\s|$))', sql)
     split_sql_list = [split_sql_value[0].lstrip() for split_sql_value in split_sql]
     # 消除窗口函数中order的影响
     split_sql_list_pos = 0
@@ -49,13 +49,14 @@ def sql_split(sql):
                 # 分割字段，根据','分割出所有字段
                 tmp_sql = [i[0].strip() for i in re.findall('(.*?(,(\s*--[^\s]*)?|$))', exec_sql_value)]
                 tmp = []
+                # 20190319 wq 合并函数中的括号和中括号
                 for tmp_sql_pos in range(len(tmp_sql)):
-                    if tmp_sql_pos > 0 and tmp_sql[tmp_sql_pos-1].count('(') != tmp_sql[tmp_sql_pos-1].count(')'):
+                    if tmp_sql_pos > 0 and (tmp_sql[tmp_sql_pos-1].count('(') != tmp_sql[tmp_sql_pos-1].count(')') or tmp_sql[tmp_sql_pos-1].count('[') != tmp_sql[tmp_sql_pos-1].count(']')):
                         tmp_sql[tmp_sql_pos] = tmp_sql[tmp_sql_pos-1] + ' ' + tmp_sql[tmp_sql_pos]
-                        # 跳过上次括号不等，留到下次合并处理
-                        if tmp_sql[tmp_sql_pos].count('(') == tmp_sql[tmp_sql_pos].count(')'):
+                        # 跳过上次括号不齐，留到下次合并处理
+                        if tmp_sql[tmp_sql_pos].count('(') == tmp_sql[tmp_sql_pos].count(')') and tmp_sql[tmp_sql_pos].count('[') == tmp_sql[tmp_sql_pos].count(']'):
                             tmp.append(tmp_sql[tmp_sql_pos])
-                    elif tmp_sql[tmp_sql_pos].count('(') == tmp_sql[tmp_sql_pos].count(')'):
+                    elif tmp_sql[tmp_sql_pos].count('(') == tmp_sql[tmp_sql_pos].count(')') and tmp_sql[tmp_sql_pos].count('[') == tmp_sql[tmp_sql_pos].count(']'):
                         tmp.append(tmp_sql[tmp_sql_pos])
                     else:
                         pass
@@ -107,6 +108,7 @@ def sql_format(sql):
     """
     level = 0
     result_sql = ''
+    sign_list = ['-', '\+', '\*', '/', '=', '<', '>', '\[', '\]', ',', '\(', '\)']
     # 20190316 wq 修复注释问题，先将注释内容取出,映射到一个随机数，等处理完后最后映射回来
     notes = re.findall('((?<=--).*?)\r\n', sql)
     notes_encode = ['w' + str(random.randint(1000000, 10000000)) + 'q' for i in notes]
@@ -120,21 +122,22 @@ def sql_format(sql):
             pass
         else:
             tmp_sql[tmp_result_sql_pos] = tmp_sql[tmp_result_sql_pos].lower()
-            for pattern_atom in ['-', '\+', '\*', '/', '=', '<', '>', '\[', '\]', ',']:
+            for pattern_atom in sign_list:
                 pattern = '[ ]*{0}[ ]*'.format(pattern_atom)
                 if pattern_atom in ['-', '\+', '\*', '/', '=', '<', '>']:
                     repl_str = ' ' + re.sub(r'\\', '', pattern_atom) + ' '
-                elif pattern_atom in ['\]', ',']:
+                elif pattern_atom in ['\]', ',', '\)']:
                     repl_str = re.sub(r'\\', '', pattern_atom) + ' '
-                elif pattern_atom == '\[':
+                elif pattern_atom in ('\[', '\('):
                     repl_str = re.sub(r'\\', '', pattern_atom)
                 else:
                     pass
                 tmp_sql[tmp_result_sql_pos] = re.sub(pattern, repl_str, tmp_sql[tmp_result_sql_pos])
-            tmp_sql[tmp_result_sql_pos] = tmp_sql[tmp_result_sql_pos].replace('> =', '>=').replace('< =', '<=').replace('-  - ', '--').replace('! =', '!=').replace('< >', '<>')
+            # 20190319 wq 优化符号间空格代码去除
+            tmp_sql[tmp_result_sql_pos] = re.sub('(?<=-|\+|\*|/|=|<|>|\[|\]|,|\(|\))\s*(?=-|\+|\*|/|=|<|>|\[|\]|,|\(|\))', '',tmp_sql[tmp_result_sql_pos])
     tmp_sql = ''.join(tmp_sql)
-    # 20190312
-    tmp_sql = re.sub('(((?<=\sas)|(?<=\sselect)|(?<=\sfrom)|(?<=\sjoin)|(?<=\son)|(?<=\swhere)|(?<=\sby)|(?<=\slimit)|(?<=\shaving)|(?<=\sunion)|(?<=\sinsert)|(?<=\screate))\()', ' (', tmp_sql)
+    # 20190312 wq 关键字后直接接左括号
+    tmp_sql = re.sub('((?<=\sselect)|(?<=\sfrom)|(?<=\sjoin)|(?<=\son)|(?<=\swhere)|(?<=\sby)|(?<=\shaving))\(', ' (', tmp_sql)
     # 按括号添加前缀空格
     split_sql = sql_split(tmp_sql)
     for split_sql_value in split_sql:
@@ -154,7 +157,7 @@ def sql_format(sql):
 
 # exec_sql = [
 #     """
-# select sql_from from order_by  limit 10
+# select * from(select sql_from, array[date( array[1,2,3,4] )][0] from order_by where array[1,2,3,4][1]=1) a  limit 10
 #     """
 # ]
 # for exec_sql_vaule in exec_sql:
@@ -162,8 +165,3 @@ def sql_format(sql):
 #     print("------------------------无情分割线-----------------------")
 #     format_sql = sql_format(exec_sql_vaule)
 #     print(format_sql)
-
-
-
-
-
