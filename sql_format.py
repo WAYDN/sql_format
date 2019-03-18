@@ -4,6 +4,7 @@
 20190309 wq 增加对 join/from等后面直接跟左括号的修复：1.分割sql时的无法识别 2.左括号前增加空格 (1.3)
 20190312 wq 修复<>的处理。对 join/from等后面直接跟左括号的进一步修复 (1.4)
 20190316 wq 1.增加对注释字段的处理 2.修改 case when...end改为同行显示 (1.5)
+20190318 wq 修复字段名中含关键字错误
 """
 
 import re
@@ -17,7 +18,8 @@ def sql_split(sql):
     :return:
     """
     # 分割sql, 结尾加\s 防止将非关键字给分割了 例如pdw_fact_person_insure中的on
-    split_sql = re.findall(r'((^\s*--[^\s]*|with.*?\(|[^,]*as\s*\(|select|from|((left|right|full|inner)\s)?join|on|where|group|order|limit|having|union|insert|create)\s.*?(?=([^,]*as\s*\(|select|from|((left|right|full|inner)\s)?join\(?|on|where|group|order|limit|having|union|insert|create)\s|$))', sql)
+    # 20190318 wq 在关键字前增加\s，防止将非关键字给分割了，例如sql_from中的from
+    split_sql = re.findall(r'((with.*?\(|[^,]*as\s*\(|select|from|((left|right|full|inner)\s)?join|on|where|group|order|limit|having|union|insert|create)\s.*?\s(?=([^,]*as\s*\(|select|from|((left|right|full|inner)\s)?join\(?|on|where|group|order|limit|having|union|insert|create)\s|$))', sql)
     split_sql_list = [split_sql_value[0].lstrip() for split_sql_value in split_sql]
     # 消除窗口函数中order的影响
     split_sql_list_pos = 0
@@ -110,7 +112,7 @@ def sql_format(sql):
     notes_encode = ['w' + str(random.randint(1000000, 10000000)) + 'q' for i in notes]
     for note_pos in range(len(notes)):
         sql = sql.replace('--' + notes[note_pos], '--' + notes_encode[note_pos])
-    sql = ' ' + re.sub('\s+', ' ', sql).strip()
+    sql = ' ' + re.sub('\s+', ' ', sql).strip() + ' '
     # 格式化运算符，关键字转化小写（跳过单引号内的字符串）
     tmp_sql = [i[0] for i in re.findall('((\'.*?\')|([^\']*))', sql)]
     for tmp_result_sql_pos in range(len(tmp_sql)):
@@ -148,3 +150,20 @@ def sql_format(sql):
     for note_pos in range(len(notes_encode)):
         result_sql = result_sql.replace(notes_encode[note_pos], notes[note_pos])
     return result_sql
+
+
+# exec_sql = [
+#     """
+# select sql_from from order_by  limit 10
+#     """
+# ]
+# for exec_sql_vaule in exec_sql:
+#     print(exec_sql_vaule)
+#     print("------------------------无情分割线-----------------------")
+#     format_sql = sql_format(exec_sql_vaule)
+#     print(format_sql)
+
+
+
+
+
