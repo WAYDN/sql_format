@@ -1,5 +1,8 @@
 # coding=utf-8
 
+"""
+20190319 wq 新增逗号前置功能
+"""
 
 import wx
 import wx.stc as ws
@@ -16,7 +19,11 @@ wrap_menu = wx.MenuItem(set_menu, 3, "自动换行", kind=wx.ITEM_CHECK)
 set_menu.Append(font_menu)
 set_menu.Append(show_space_menu)
 set_menu.Append(wrap_menu)
+trans_menu = wx.Menu()
+comma_menu = wx.MenuItem(set_menu, 4, "逗号前置", kind=wx.ITEM_CHECK)
+trans_menu.Append(comma_menu)
 menu_bar.Append(set_menu, title="设置")
+menu_bar.Append(trans_menu, title="变换")
 
 sf_frame.SetMenuBar(menu_bar)
 sf_frame.Center()
@@ -34,7 +41,7 @@ select  a.user_id,
         a.name
   from  (
         select  user_id,
-                trim(name) as name,
+                trim(name) as name,--中文名字
                 row_number() over (partiti  on by user_id  order by apply_time desc) as rn
           from  ods.ods_chain_store_user_auth
          where  regexp_like(trim(name), '^[\u4E00-\u9FA5]+$')
@@ -53,7 +60,10 @@ button.SetDefault()
 def exec_format(event):
     source_sql = source_sql_text.GetValue()
     sql = sql_format.sql_format(source_sql)
-    sql_text.SetValue(sql)
+    if comma_menu.IsChecked():
+        sql_text.SetValue(sql_format.comma_trans(sql))
+    else:
+         sql_text.SetValue(sql)
 button.Bind(wx.EVT_BUTTON, exec_format)
 
 def eventMenu(event):
