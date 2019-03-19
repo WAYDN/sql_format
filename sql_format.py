@@ -160,7 +160,7 @@ def comma_trans(sql):
     逗号前置
     :param sql:string/待处理sql
     """
-    sql = re.sub('\s{4}(?!(with|as|select|from|left|right|full|inner|join|on|where|group|order|limit|having|union|insert|create|when|else|end|and|or)\s)(?=\w)', '    ,', re.sub(',(?=\r\n)', '', sql))
+    sql = re.sub('\s{4}(?!(with|as|select|from|left|right|full|inner|join|on|where|group|order|limit|having|union|insert|create|when|else|end|and|or)\s)(?=\w)', '    ,', re.sub(',(?=(\s*--\s*[^\s]*)?\r\n)', '', sql))
     return sql
 
 
