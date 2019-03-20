@@ -5,7 +5,7 @@
 20190312 wq 修复<>的处理。对 join/from等后面直接跟左括号的进一步修复 (1.4)
 20190316 wq 1.增加对注释字段的处理 2.修改 case when...end改为同行显示 (1.5)
 20190319 wq 1.修复字段名中含关键字错误 2.符号后空格问题及中括号被分割问题 3增加逗号前置功能 4增加首行注释处理（1.6）
-20190320 wq 补充关键字 cross （1.6.2）
+20190320 wq 1.补充关键字 cross 2.修复注释中的多余空格 （1.7）
 """
 
 import re
@@ -45,7 +45,7 @@ def sql_split(sql):
         # 分割 sql中的‘字段’和‘逻辑判断条件’；并根据关键字添加空格
         for exec_sql_pos in range(len(exec_sql)):
             exec_sql_value = exec_sql[exec_sql_pos].strip()
-            first_value = re.match(r'^\s*((--)|\w+|\))\s?', exec_sql_value).group(1)
+            first_value = re.match(r'\s*(--|\w+|\))\s?', exec_sql_value).group(1)
             if first_value in ('select', 'group', 'order'):
                 # 分割字段，根据','分割出所有字段
                 tmp_sql = [i[0].strip() for i in re.findall('(.*?(,(\s*--\s*[^\s]*)?|$))', exec_sql_value)]
@@ -153,7 +153,7 @@ def sql_format(sql):
         else:
             pass
     for note_pos in range(len(notes_encode)):
-        result_sql = result_sql.replace(notes_encode[note_pos], notes[note_pos])
+        result_sql = result_sql.replace(notes_encode[note_pos], notes[note_pos].strip())
     # 20190319 wq 修复逗号前置和字段中含注释所导致的错误（逗号被注释掉）
     result_sql = re.sub('"\s*--', '", --', result_sql)
     return result_sql
@@ -171,7 +171,7 @@ def comma_trans(sql):
 
 # exec_sql = [
 #     """
-# -- 20190131 wq 321
+#
 # select qwe
 #
 #     """
