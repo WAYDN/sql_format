@@ -20,7 +20,7 @@ def sql_split(sql):
     """
     # 分割sql, 结尾加\s 防止将非关键字给分割了 例如pdw_fact_person_insure中的on
     # 20190318 wq 在关键字前增加\s，防止将非关键字给分割了，例如sql_from中的from
-    split_sql = re.findall(r'(((^(\s*--\s*[^\s]*)*|with.*?\(|[^,]*as\s*\()|(select|from|((left|right|full|inner|cross)\s)?join|on|where|group|order|limit|having|union|insert|create)\s).*?(?=\s*(with.*?\(|[^,]*as\s*\()|(select|from|((left|right|full|inner|cross)\s)?join\(?|on|where|group|order|limit|having|union|insert|create)\s|$))', sql)
+    split_sql = re.findall(r'(((^(\s*--\s*[^\s]*)+|with.*?\(|[^,]*as\s*\()|(select|from|((left|right|full|inner|cross)\s)?join|on|where|group|order|limit|having|union|insert|create)\s).*?(?=\s*(with.*?\(|[^,]*as\s*\()|(select|from|((left|right|full|inner|cross)\s)?join\(?|on|where|group|order|limit|having|union|insert|create)\s|$))', sql)
     split_sql_list = [split_sql_value[0].lstrip() for split_sql_value in split_sql]
     # 20190319 wq 消除窗口函数中order等字段中含关键字的影响,将select到from或select整合在一起
     split_sql_list_pos = 0
