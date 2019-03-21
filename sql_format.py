@@ -6,12 +6,25 @@
 20190316 wq 1.增加对注释字段的处理 2.修改 case when...end改为同行显示 (1.5)
 20190319 wq 1.修复字段名中含关键字错误 2.符号后空格问题及中括号被分割问题 3增加逗号前置功能 4增加首行注释处理（1.6）
 20190320 wq 1.补充关键字 cross 2.修复注释中的多余空格 （1.7）
-20190321 wq 修复逗号前置和字段中含注释所导致的错误，即逗号被注释掉 （1.7.1）
+20190321 wq 1.修复逗号前置和字段中含注释所导致的错误，即逗号被注释掉 2.优化符号的处理 （1.8）
 """
 
 import re
-from common import common_func
 import random
+
+def list_remake(l):
+    """
+    将多维数据转化为一维数组
+    :param l: list
+    :return: list/返回一维数组
+    """
+    if type(l) == list:
+        result = []
+        for i in l:
+            result += list_remake(i)
+        return result
+    else:
+        return [l]
 
 def sql_split(sql):
     """
@@ -39,7 +52,7 @@ def sql_split(sql):
             tmp = split_sql_value
             while tmp.count('(') < tmp.count(')'):
                 exec_sql[0] = list(re.findall(r'^(.*)(\).*?,?)$', tmp)[0])
-                exec_sql = common_func.list_remake(exec_sql)
+                exec_sql = list_remake(exec_sql)
                 tmp = exec_sql[0]
         else:
             exec_sql = [split_sql_value]
@@ -65,7 +78,7 @@ def sql_split(sql):
                 # 添加字段前空格
                 for tmp_pos in range(len(tmp)):
                     # 20190321 wq 修复逗号前置和字段中含注释所导致的错误（逗号被注释掉）
-                    if re.search('^[^,]+--.*,$', tmp[tmp_pos]) is not None:
+                    if re.search('[^,]+--.*,$', tmp[tmp_pos]) is not None:
                         tmp[tmp_pos] = re.sub('(?<=[^,])\s*--', ', --', tmp[tmp_pos])
                     if tmp_pos == 0:
                         tmp[tmp_pos] = re.sub(r'^\s*(\w*)\s*', first_value.rjust(6) + 2 * " ", tmp[tmp_pos])
@@ -102,7 +115,7 @@ def sql_split(sql):
                     # exec_sql[exec_sql_pos] = 8 * " " + exec_sql[exec_sql_pos]
                     pass
         split_sql_list[split_sql_pos] = exec_sql
-    return common_func.list_remake(split_sql_list)
+    return list_remake(split_sql_list)
 
 
 def sql_format(sql):
@@ -113,7 +126,6 @@ def sql_format(sql):
     """
     level = 0
     result_sql = ''
-    sign_list = ['-', '\+', '\*', '/', '=', '<', '>', '\[', '\]', ',', '\(', '\)']
     # 20190316 wq 修复注释问题，先将注释内容取出,映射到一个随机数，等处理完后最后映射回来
     notes = re.findall('((?<=--).*?)\r?\n', sql)
     notes_encode = ['w' + str(random.randint(1000000, 10000000)) + 'q' for i in notes]
@@ -127,19 +139,26 @@ def sql_format(sql):
             pass
         else:
             tmp_sql[tmp_result_sql_pos] = tmp_sql[tmp_result_sql_pos].lower()
-            for pattern_atom in sign_list:
+            for pattern_atom in ['\[', '\(', '\]', ',', '\)', '\+', '-', '\*', '/', '=', '<', '>']:
                 pattern = '[ ]*{0}[ ]*'.format(pattern_atom)
-                if pattern_atom in ['-', '\+', '\*', '/', '=', '<', '>']:
-                    repl_str = ' ' + re.sub(r'\\', '', pattern_atom) + ' '
+                if pattern_atom in ('\[', '\('):
+                    repl_str = re.sub(r'\\', '', pattern_atom)
                 elif pattern_atom in ['\]', ',', '\)']:
                     repl_str = re.sub(r'\\', '', pattern_atom) + ' '
-                elif pattern_atom in ('\[', '\('):
-                    repl_str = re.sub(r'\\', '', pattern_atom)
+                elif pattern_atom in ['\+', '\*', '/', '=', '<', '>']:
+                    repl_str = ' ' + re.sub(r'\\', '', pattern_atom) + ' '
+                elif pattern_atom == '-':
+                    repl_str = ' - '
+                    pattern = '[ ]*(?<!-)-(?!-)[ ]*'
                 else:
                     pass
                 tmp_sql[tmp_result_sql_pos] = re.sub(pattern, repl_str, tmp_sql[tmp_result_sql_pos])
-            # 20190319 wq 优化符号间空格代码去除
-            tmp_sql[tmp_result_sql_pos] = re.sub('(?<=-|\+|\*|/|=|<|>|\[|\]|,|\(|\))\s*(?=-|\+|\*|/|=|<|>|\[|\]|,|\(|\))', '',tmp_sql[tmp_result_sql_pos])
+            # 20190321 wq 优化符号的处理，例如"100 * -1"
+            tmp_sql[tmp_result_sql_pos] = re.sub('(?<=\[|\]|,|\(|\))\s*(?=\[|\]|,|\(|\))', '', tmp_sql[tmp_result_sql_pos])
+            tmp_sql[tmp_result_sql_pos] = re.sub('(?<==|<|>)\s*(?==|<|>)', '', tmp_sql[tmp_result_sql_pos])
+            tmp_sql[tmp_result_sql_pos] = re.sub('(?<=,\s(\+|-))\s*(?!-)', '', tmp_sql[tmp_result_sql_pos])
+            tmp_sql[tmp_result_sql_pos] = re.sub('(?<=-|\+|\*|/|=|<|>)\s*(?!-|\+|\*|/|=|<|>)', '', tmp_sql[tmp_result_sql_pos])
+
             tmp_sql[tmp_result_sql_pos] = tmp_sql[tmp_result_sql_pos].replace('(--', '( --')
     tmp_sql = ''.join(tmp_sql)
     # 20190312 wq 关键字后直接接左括号
@@ -170,15 +189,20 @@ def comma_trans(sql):
 
 
 
-
+#
 # exec_sql = [
 #     """
-#
-# select qwe
+# select * from (---
+# select date(dsfsdf,sdfsdf)*-1
 # --sdfsdf
-# ,sdfsd,
-# fdsfs
+# ,sdfsd * -1 = -1,
+# fdsfs * (sdfsdfsdf) +(dsfsdfe) +- (fsdfef)
 # ,sdfsdf
+# , '< >'
+# ,-1-1,
+#  - 1,
+#  - -1
+# )
 #
 #     """
 # ]
@@ -187,4 +211,4 @@ def comma_trans(sql):
 #     print("------------------------无情分割线-----------------------")
 #     format_sql = sql_format(exec_sql_vaule)
 #     print(format_sql)
-#     print(comma_trans(format_sql))
+#     # print(comma_trans(format_sql))
