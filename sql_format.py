@@ -6,6 +6,7 @@
 20190316 wq 1.增加对注释字段的处理 2.修改 case when...end改为同行显示 (1.5)
 20190319 wq 1.修复字段名中含关键字错误 2.符号后空格问题及中括号被分割问题 3增加逗号前置功能 4增加首行注释处理（1.6）
 20190320 wq 1.补充关键字 cross 2.修复注释中的多余空格 （1.7）
+20190321 wq 修复逗号前置和字段中含注释所导致的错误，即逗号被注释掉 （1.7.1）
 """
 
 import re
@@ -63,6 +64,9 @@ def sql_split(sql):
                         pass
                 # 添加字段前空格
                 for tmp_pos in range(len(tmp)):
+                    # 20190321 wq 修复逗号前置和字段中含注释所导致的错误（逗号被注释掉）
+                    if re.search('^[^,]+--.*,$', tmp[tmp_pos]) is not None:
+                        tmp[tmp_pos] = re.sub('(?<=[^,])\s*--', ', --', tmp[tmp_pos])
                     if tmp_pos == 0:
                         tmp[tmp_pos] = re.sub(r'^\s*(\w*)\s*', first_value.rjust(6) + 2 * " ", tmp[tmp_pos])
                     else:
@@ -154,8 +158,6 @@ def sql_format(sql):
             pass
     for note_pos in range(len(notes_encode)):
         result_sql = result_sql.replace(notes_encode[note_pos], notes[note_pos].strip())
-    # 20190319 wq 修复逗号前置和字段中含注释所导致的错误（逗号被注释掉）
-    result_sql = re.sub('"\s*--', '", --', result_sql)
     return result_sql
 
 def comma_trans(sql):
@@ -173,6 +175,10 @@ def comma_trans(sql):
 #     """
 #
 # select qwe
+# --sdfsdf
+# ,sdfsd,
+# fdsfs
+# ,sdfsdf
 #
 #     """
 # ]
@@ -181,4 +187,4 @@ def comma_trans(sql):
 #     print("------------------------无情分割线-----------------------")
 #     format_sql = sql_format(exec_sql_vaule)
 #     print(format_sql)
-#     # print(comma_trans(format_sql))
+#     print(comma_trans(format_sql))
