@@ -6,7 +6,7 @@
 
 import wx
 import wx.stc as ws
-import sql_format
+from sql_format import sql_format_exec
 
 sf_app = wx.App()
 sf_frame = wx.Frame(None, title='SQL格式助手', size=(800, 800), style=wx.DEFAULT_FRAME_STYLE)
@@ -59,11 +59,14 @@ button = wx.Button(sf_panel, label="格式化", style=wx.BORDER_MASK)
 button.SetDefault()
 def exec_format(event):
     source_sql = source_sql_text.GetValue()
-    sql = sql_format.sql_format(source_sql)
-    if comma_menu.IsChecked():
-        sql_text.SetValue(sql_format.comma_trans(sql))
-    else:
-         sql_text.SetValue(sql)
+    try:
+        sql = sql_format_exec.sql_format(source_sql)
+        if comma_menu.IsChecked():
+            sql_text.SetValue(sql_format_exec.comma_trans(sql))
+        else:
+             sql_text.SetValue(sql)
+    except:
+        sql_text.SetValue("调用出现问题")
 button.Bind(wx.EVT_BUTTON, exec_format)
 
 def eventMenu(event):
