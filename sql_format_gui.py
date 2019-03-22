@@ -6,7 +6,7 @@
 
 import wx
 import wx.stc as ws
-from common import sql_format
+import sql_format
 
 sf_app = wx.App()
 sf_frame = wx.Frame(None, title='SQL格式助手', size=(800, 800), style=wx.DEFAULT_FRAME_STYLE)
