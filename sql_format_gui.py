@@ -6,10 +6,13 @@
 
 import wx
 import wx.stc as ws
-from sql_format import sql_format_exec
+import sql_format_exec
 
 sf_app = wx.App()
-sf_frame = wx.Frame(None, title='SQL格式助手', size=(800, 800), style=wx.DEFAULT_FRAME_STYLE)
+sf_frame = wx.Frame(None, title='SQL格式助手', size=(640, 480), style=wx.DEFAULT_FRAME_STYLE)
+sf_frame.SetIcon(wx.Icon('sql_format.ico'))
+sf_frame.SetBackgroundColour("#FFFFFF")
+sf_frame.Center()
 # 菜单栏设置
 menu_bar = wx.MenuBar()
 set_menu = wx.Menu()
@@ -30,13 +33,12 @@ sf_frame.Center()
 sf_panel = wx.Panel(sf_frame)
 sf_panel.SetBackgroundColour('#F5F5F5')
 
-source_sql_label = wx.StaticText(sf_panel, label='待处理SQL:')
-source_sql_text = ws.StyledTextCtrl(sf_panel, style=wx.TE_MULTILINE | wx.HSCROLL | wx.TE_RICH)
-source_sql_text.SetMarginType(1, ws.STC_MARGIN_NUMBER)
-source_sql_text.SetMarginWidth(1, 25)
-source_sql_text.StyleSetFontAttr(0, 10, "Consolas", False, False, False)
-source_sql_text.SetUseTabs(False)
-source_sql_text.SetValue("""
+sql_text = ws.StyledTextCtrl(sf_panel, style=wx.TE_MULTILINE | wx.HSCROLL | wx.TE_RICH)
+sql_text.SetMarginType(1, ws.STC_MARGIN_NUMBER)
+sql_text.SetMarginWidth(1, 25)
+sql_text.StyleSetFontAttr(0, 10, "Consolas", False, False, False)
+sql_text.SetUseTabs(False)
+sql_text.SetValue("""
 select  a.user_id,
         a.name
   from  (
@@ -48,25 +50,39 @@ select  a.user_id,
         ) a
  where  rn = 1
  """)
-sql_label = wx.StaticText(sf_panel, label='处理后SQL:')
-sql_text = ws.StyledTextCtrl(sf_panel, style=wx.TE_MULTILINE | wx.HSCROLL | wx.TE_RICH)
-sql_text.SetMarginType(1, ws.STC_MARGIN_NUMBER)
-sql_text.SetMarginWidth(1, 25)
-sql_text.StyleSetFontAttr(0, 10, "Consolas", False, False, False)
 
 # 按钮控件
-button = wx.Button(sf_panel, label="格式化", style=wx.BORDER_MASK)
+button = wx.Button(sf_panel, label="格式化", style=wx.Center)
+button.SetWindowStyleFlag(wx.NO_BORDER)
 button.SetDefault()
+button_bc = button.GetBackgroundColour()
+button_fc = button.GetForegroundColour()
+
+
+def button_enter(event):
+    button.SetBackgroundColour("#338BB8")
+    button.SetForegroundColour("#FFFFFF")
+
+
+def button_leave(event):
+    button.SetBackgroundColour(button_bc)
+    button.SetForegroundColour(button_fc)
+
+
 def exec_format(event):
-    source_sql = source_sql_text.GetValue()
+    source_sql = sql_text.GetValue()
     try:
         sql = sql_format_exec.sql_format(source_sql)
         if comma_menu.IsChecked():
             sql_text.SetValue(sql_format_exec.comma_trans(sql))
         else:
-             sql_text.SetValue(sql)
+            sql_text.SetValue(sql)
     except:
         sql_text.SetValue("调用出现问题")
+
+
+button.Bind(wx.EVT_ENTER_WINDOW, button_enter)
+button.Bind(wx.EVT_LEAVE_WINDOW, button_leave)
 button.Bind(wx.EVT_BUTTON, exec_format)
 
 def eventMenu(event):
@@ -75,37 +91,24 @@ def eventMenu(event):
         dlg = wx.FontDialog()
         if dlg.ShowModal() == wx.ID_OK:
             data = dlg.GetFontData()
-            source_sql_text.StyleSetFont(0, data.GetChosenFont())
             sql_text.StyleSetFont(0, data.GetChosenFont())
         dlg.Destroy()
     elif id == 2:
-        source_sql_text.SetViewWhiteSpace(show_space_menu.IsChecked())
-        source_sql_text.SetWhitespaceForeground(True, 'Red')
-        source_sql_text.SetWhitespaceSize(2)
         sql_text.SetViewWhiteSpace(show_space_menu.IsChecked())
         sql_text.SetWhitespaceForeground(True, 'Red')
         sql_text.SetWhitespaceSize(2)
     elif id == 3:
         if wrap_menu.IsChecked():
-            source_sql_text.SetWrapMode(1)
             sql_text.SetWrapMode(1)
         else:
-            source_sql_text.SetWrapMode(0)
             sql_text.SetWrapMode(0)
 set_menu.Bind(wx.EVT_MENU, eventMenu)
 
 
-source_v_box = wx.BoxSizer(wx.VERTICAL)
-source_v_box.Add(source_sql_label, proportion=0)
-source_v_box.Add(source_sql_text, proportion=1, flag=wx.EXPAND)
 v_box = wx.BoxSizer(wx.VERTICAL)
-v_box.Add(sql_label, proportion=0)
 v_box.Add(sql_text, proportion=1, flag=wx.EXPAND)
-v_box_2 = wx.BoxSizer(wx.VERTICAL)
-v_box_2.Add(source_v_box, proportion=1, flag=wx.EXPAND)
-v_box_2.Add(button, proportion=0, flag=wx.EXPAND)
-v_box_2.Add(v_box, proportion=1, flag=wx.EXPAND)
-sf_panel.SetSizer(v_box_2)
+v_box.Add(button, proportion=0, flag=wx.ALIGN_CENTER | wx.ALL, border=5)
+sf_panel.SetSizer(v_box)
 
 sf_frame.Show()
 sf_app.MainLoop()
