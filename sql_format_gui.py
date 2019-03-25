@@ -27,9 +27,8 @@ comma_menu = wx.MenuItem(set_menu, 4, "逗号前置", kind=wx.ITEM_CHECK)
 trans_menu.Append(comma_menu)
 menu_bar.Append(set_menu, title="设置")
 menu_bar.Append(trans_menu, title="变换")
-
 sf_frame.SetMenuBar(menu_bar)
-sf_frame.Center()
+
 sf_panel = wx.Panel(sf_frame)
 sf_panel.SetBackgroundColour('#F5F5F5')
 
