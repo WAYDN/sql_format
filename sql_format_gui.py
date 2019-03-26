@@ -71,7 +71,7 @@ def button_leave(event):
 def exec_format(event):
     source_sql = sql_text.GetValue()
     try:
-        sql = sql_format_exec.sql_format(source_sql)
+        sql = sql_format_exec.sql_format(source_sql)[0]
         if comma_menu.IsChecked():
             sql_text.SetValue(sql_format_exec.comma_trans(sql))
         else:
