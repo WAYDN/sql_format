@@ -8,7 +8,7 @@
 20190320 wq 1.补充关键字 cross 2.修复注释中的多余空格 （1.7）
 20190321 wq 1.修复逗号前置和字段中含注释所导致的错误，即逗号被注释掉 2.优化符号的处理 （1.8）
 20190322 wq 1.when/else换行 2.else后跟低于10个字符 end不换行(1.9)
-20190326 wq 1.修复关键字遗留问题 2.增加返回表名(1.10)
+20190326 wq 1.修复关键字遗留问题 2.增加返回表名 3.join中含outer(1.10)
 """
 
 import re
@@ -36,7 +36,7 @@ def sql_split(sql):
     """
     # 分割sql, 结尾加\s 防止将非关键字给分割了 例如pdw_fact_person_insure中的on
     # 20190326 wq 在关键字前后增加\s，防止将非关键字给分割了，例如sql_from中的from
-    split_sql = re.findall(r'(((^(\s*--\s*[^\s]*)+|with.*?\(|[^,]*as\s*\()|(select|from|((left|right|full|inner|cross)\s)?join|on|where|group|order|limit|having|union|insert|create)\s).*?(?=\s*(with.*?\(|[^,]*as\s*\()|\s(select|from|((left|right|full|inner|cross)\s)?join\(?|on|where|group|order|limit|having|union|insert|create)\s|$))', sql)
+    split_sql = re.findall(r'(((^(\s*--\s*[^\s]*)+|with.*?\(|[^,]*as\s*\()|(select|from|((left|right|full|inner|cross)\s(outer\s)?)?join|on|where|group|order|limit|having|union|insert|create)\s).*?(?=\s*(with.*?\(|[^,]*as\s*\()|\s(select|from|((left|right|full|inner|cross)\s(outer\s)?)?join\(?|on|where|group|order|limit|having|union|insert|create)\s|$))', sql)
     split_sql_list = [split_sql_value[0].lstrip() for split_sql_value in split_sql]
     # 20190319 wq 消除窗口函数中order等字段中含关键字的影响,将select到from或select整合在一起
     split_sql_list_pos = 0
