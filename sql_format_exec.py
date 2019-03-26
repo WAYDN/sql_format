@@ -36,7 +36,7 @@ def sql_split(sql):
     """
     # 分割sql, 结尾加\s 防止将非关键字给分割了 例如pdw_fact_person_insure中的on
     # 20190326 wq 在关键字前后增加\s，防止将非关键字给分割了，例如sql_from中的from
-    split_sql = re.findall(r'(((^(\s*--\s*[^\s]*)+|with.*?\(|[^,]*as\s*\()|(select|from|((left|right|full|inner|cross)\s(outer\s)?)?join|on|where|group|order|limit|having|union|insert|create)\s).*?(?=\s*(with.*?\(|[^,]*as\s*\()|\s(select|from|((left|right|full|inner|cross)\s(outer\s)?)?join\(?|on|where|group|order|limit|having|union|insert|create)\s|$))', sql)
+    split_sql = re.findall(r'(((^(\s*--\s*[^\s]*)+|\swith.*?\(|[^,]*as\s*\()|(select|from|((left|right|full|inner|cross)\s(outer\s)?)?join|on|where|group|order|limit|having|union|insert|create)\s).*?(?=\s+(with.*?\(|[^,]*as\s*\()|\s(select|from|((left|right|full|inner|cross)\s(outer\s)?)?join\(?|on|where|group|order|limit|having|union|insert|create)\s|$))', sql)
     split_sql_list = [split_sql_value[0].lstrip() for split_sql_value in split_sql]
     # 20190319 wq 消除窗口函数中order等字段中含关键字的影响,将select到from或select整合在一起
     split_sql_list_pos = 0
@@ -197,27 +197,17 @@ def comma_trans(sql):
 
 
 
-exec_sql = [
-    """
-select * from (---
-select date(dsfsdf,sdfsdf)*-1
---sdfsdf
-,sdfsd * -1 = -1,
-fdsfs * (sdfsdfsdf) +(dsfsdfe) +- (fsdfef)
-,sdfsdf
-, '< >'
-,-1-1,
- - 1,
- - -1,
- case when substr(     age_start, -1)='D' then 0 else substr(age_start, 0,length(age_start)-1) end as begin_age,case when substr(age_end, -1)<='D' then 0 else subs end as end_age
- from 123 where ddd in       (select 123 )
-)
-
-    """
-]
-for exec_sql_vaule in exec_sql:
-    print(exec_sql_vaule)
-    print("------------------------无情分割线-----------------------")
-    format_sql = sql_format(exec_sql_vaule)
-    print(format_sql[0])
-    # print(comma_trans(format_sql))
+# exec_sql = [
+#     """
+# 		select renewal_policy_uuid
+# 		 from baoxian.baoxian.sales_insure_policy_renewal_withhold
+# 		 where withhold_status in (200,100)
+# 		 -- and renewal_withhold_enable = true
+#     """
+# ]
+# for exec_sql_vaule in exec_sql:
+#     print(exec_sql_vaule)
+#     print("------------------------无情分割线-----------------------")
+#     format_sql = sql_format(exec_sql_vaule)
+#     print(format_sql[0])
+#     # print(comma_trans(format_sql))
