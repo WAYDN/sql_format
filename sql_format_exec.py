@@ -8,7 +8,7 @@
 20190320 wq 1.补充关键字 cross 2.修复注释中的多余空格 （1.7）
 20190321 wq 1.修复逗号前置和字段中含注释所导致的错误，即逗号被注释掉 2.优化符号的处理 （1.8）
 20190322 wq 1.when/else换行 2.else后跟低于10个字符 end不换行(1.9)
-20190326 wq 1.修复关键字遗留问题 2.增加返回表名 3.join中含outer(1.10)
+20190326 wq 1.修复关键字遗留问题 2.增加返回表名 3.join中含outer 4.子查询中左括号直接跟select(1.10)
 """
 
 import re
@@ -148,8 +148,8 @@ def sql_format(sql):
                 elif pattern_atom in ['\+', '\*', '/', '=', '<', '>']:
                     repl_str = ' ' + re.sub(r'\\', '', pattern_atom) + ' '
                 elif pattern_atom == '-':
-                    repl_str = ' - '
                     pattern = '[ ]*(?<!-)-(?!-)[ ]*'
+                    repl_str = ' - '
                 else:
                     pass
                 tmp_sql[tmp_result_sql_pos] = re.sub(pattern, repl_str, tmp_sql[tmp_result_sql_pos])
@@ -158,13 +158,12 @@ def sql_format(sql):
             tmp_sql[tmp_result_sql_pos] = re.sub('(?<==|<|>)\s*(?==|<|>)', '', tmp_sql[tmp_result_sql_pos])
             # 字段中符号开头
             tmp_sql[tmp_result_sql_pos] = re.sub('(?<=,\s(\+|-))\s*(?!-)', '', tmp_sql[tmp_result_sql_pos])
-            # 字段中含
             tmp_sql[tmp_result_sql_pos] = re.sub('(?<=(\+|-|\*|/|=|<|>)\s(\+|-))\s*', '', tmp_sql[tmp_result_sql_pos])
-
-            tmp_sql[tmp_result_sql_pos] = tmp_sql[tmp_result_sql_pos].replace('(--', '( --')
+            # 20190326 wq 修复子查询的问题
+            tmp_sql[tmp_result_sql_pos] = tmp_sql[tmp_result_sql_pos].replace('(--', '( --').replace('(select ', '( select ')
     tmp_sql = ''.join(tmp_sql)
     # 20190312 wq 关键字后直接接左括号
-    tmp_sql = re.sub('((?<=\sselect)|(?<=\sfrom)|(?<=\sjoin)|(?<=\son)|(?<=\swhere)|(?<=\sby)|(?<=\shaving)|(?<=\sas))\(', ' (', tmp_sql)
+    tmp_sql = re.sub('((?<=\sselect)|(?<=\sfrom)|(?<=\sjoin)|(?<=\son)|(?<=\swhere)|(?<=\sby)|(?<=\shaving)|(?<=\sas)|(?<=\sin))\(', ' (', tmp_sql)
     # 按括号添加前缀空格
     split_sql = sql_split(tmp_sql)
     table_list = []
@@ -198,27 +197,27 @@ def comma_trans(sql):
 
 
 
-# exec_sql = [
-#     """
-# select * from (---
-# select date(dsfsdf,sdfsdf)*-1
-# --sdfsdf
-# ,sdfsd * -1 = -1,
-# fdsfs * (sdfsdfsdf) +(dsfsdfe) +- (fsdfef)
-# ,sdfsdf
-# , '< >'
-# ,-1-1,
-#  - 1,
-#  - -1,
-#  case when substr(age_start, -1)='D' then 0 else substr(age_start, 0,length(age_start)-1) end as begin_age,case when substr(age_end, -1)<='D' then 0 else subs end as end_age
-#
-# )
-#
-#     """
-# ]
-# for exec_sql_vaule in exec_sql:
-#     print(exec_sql_vaule)
-#     print("------------------------无情分割线-----------------------")
-#     format_sql = sql_format(exec_sql_vaule)
-#     print(format_sql)
-#     # print(comma_trans(format_sql))
+exec_sql = [
+    """
+select * from (---
+select date(dsfsdf,sdfsdf)*-1
+--sdfsdf
+,sdfsd * -1 = -1,
+fdsfs * (sdfsdfsdf) +(dsfsdfe) +- (fsdfef)
+,sdfsdf
+, '< >'
+,-1-1,
+ - 1,
+ - -1,
+ case when substr(     age_start, -1)='D' then 0 else substr(age_start, 0,length(age_start)-1) end as begin_age,case when substr(age_end, -1)<='D' then 0 else subs end as end_age
+ from 123 where ddd in       (select 123 )
+)
+
+    """
+]
+for exec_sql_vaule in exec_sql:
+    print(exec_sql_vaule)
+    print("------------------------无情分割线-----------------------")
+    format_sql = sql_format(exec_sql_vaule)
+    print(format_sql[0])
+    # print(comma_trans(format_sql))
