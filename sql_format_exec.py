@@ -9,6 +9,7 @@
 20190321 wq 1.修复逗号前置和字段中含注释所导致的错误，即逗号被注释掉 2.优化符号的处理 （1.8）
 20190322 wq 1.when/else换行 2.else后跟低于10个字符 end不换行(1.9)
 20190326 wq 1.修复关键字遗留问题 2.增加返回表名 3.join中含outer 4.子查询中左括号直接跟select(1.10)
+20190327 wq 1.修复两类注释问题 --，/* */(1.11)
 """
 
 import re
@@ -127,10 +128,10 @@ def sql_format(sql):
     level = 0
     result_sql = ''
     # 20190316 wq 修复注释问题，先将注释内容取出,映射到一个随机数，等处理完后最后映射回来
-    notes = re.findall('((?<=--).*?)\r?\n', sql)
+    notes = [i[0] for i in re.findall('(\s*(--.*?(?=\r?\n)|/\*(.|\n)*?\*/))', sql)]
     notes_encode = ['w' + str(random.randint(1000000, 10000000)) + 'q' for i in notes]
     for note_pos in range(len(notes)):
-        sql = sql.replace('--' + notes[note_pos], '--' + notes_encode[note_pos])
+        sql = sql.replace(notes[note_pos], '--' + notes_encode[note_pos])
     sql = ' ' + re.sub('\s+', ' ', sql).strip() + ' '
     # 格式化运算符，关键字转化小写（跳过单引号内的字符串）
     tmp_sql = [i[0] for i in re.findall('((\'.*?\')|([^\']*))', sql)]
@@ -182,7 +183,7 @@ def sql_format(sql):
         else:
             pass
     for note_pos in range(len(notes_encode)):
-        result_sql = result_sql.replace(notes_encode[note_pos], notes[note_pos].strip())
+        result_sql = re.sub('--\s*' + notes_encode[note_pos], notes[note_pos], result_sql)
     return [result_sql, table_list]
 
 
@@ -199,8 +200,12 @@ def comma_trans(sql):
 
 # exec_sql = [
 #     """
+#     /*dddd
+#     dddd*/
 # 		select renewal_policy_uuid
 # 		 from baoxian.baoxian.sales_insure_policy_renewal_withhold
+#          /*ddd
+#          sss*/
 # 		 where withhold_status in (200,100)
 # 		 -- and renewal_withhold_enable = true
 #     """
