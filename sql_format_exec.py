@@ -10,6 +10,7 @@
 20190322 wq 1.when/else换行 2.else后跟低于10个字符 end不换行(1.9)
 20190326 wq 1.修复关键字遗留问题 2.增加返回表名 3.join中含outer 4.子查询中左括号直接跟select(1.10)
 20190327 wq 1.修复两类注释问题 --，/* */(1.11)
+20190328 wq 1.调整格式 2.优化表名获取(剔除自定义表名)(1.12)
 """
 
 import re
@@ -37,13 +38,20 @@ def sql_split(sql):
     """
     # 分割sql, 结尾加\s 防止将非关键字给分割了 例如pdw_fact_person_insure中的on
     # 20190326 wq 在关键字前后增加\s，防止将非关键字给分割了，例如sql_from中的from
-    split_sql = re.findall(r'(((^(\s*--\s*[^\s]*)+|\swith.*?\(|[^,]*as\s*\()|(select|from|((left|right|full|inner|cross)\s(outer\s)?)?join|on|where|group|order|limit|having|union|insert|create)\s).*?(?=\s+(with.*?\(|[^,]*as\s*\()|\s(select|from|((left|right|full|inner|cross)\s(outer\s)?)?join\(?|on|where|group|order|limit|having|union|insert|create)\s|$))', sql)
+    split_sql = re.findall(r'(((^(\s*--\s*[^\s]*)+|\swith.*?\(|[^,]*as\s*\()|'
+                           r'(select|from|((left|right|full|inner|cross)\s(outer\s)?)?join|'
+                           r'on|where|group|order|limit|having|union|insert|create)\s)'
+                           r'.*?'
+                           r'(?=\s+(with.*?\(|[^,]*as\s*\()|'
+                           r'\s(select|from|((left|right|full|inner|cross)\s(outer\s)?)?join\(?|'
+                           r'on|where|group|order|limit|having|union|insert|create)\s|$))', sql)
     split_sql_list = [split_sql_value[0].lstrip() for split_sql_value in split_sql]
     # 20190319 wq 消除窗口函数中order等字段中含关键字的影响,将select到from或select整合在一起
     split_sql_list_pos = 0
     while split_sql_list_pos < len(split_sql_list)-1 and len(split_sql_list) > 1:
-        if re.search('^select', split_sql_list[split_sql_list_pos]) and not re.search('^(from|select)', split_sql_list[split_sql_list_pos+1]):
-            split_sql_list[split_sql_list_pos] = split_sql_list[split_sql_list_pos] + ' ' + split_sql_list[split_sql_list_pos+1]
+        if re.search('^select(?![^\(]+\))', split_sql_list[split_sql_list_pos]) \
+                and not re.search('^(from|select)', split_sql_list[split_sql_list_pos+1]):
+            split_sql_list[split_sql_list_pos] += ' ' + split_sql_list[split_sql_list_pos+1]
             split_sql_list.pop(split_sql_list_pos+1)
         else:
             split_sql_list_pos += 1
@@ -69,12 +77,15 @@ def sql_split(sql):
                 tmp = []
                 # 20190319 wq 合并函数中的括号和中括号
                 for tmp_sql_pos in range(len(tmp_sql)):
-                    if tmp_sql_pos > 0 and (tmp_sql[tmp_sql_pos-1].count('(') != tmp_sql[tmp_sql_pos-1].count(')') or tmp_sql[tmp_sql_pos-1].count('[') != tmp_sql[tmp_sql_pos-1].count(']')):
+                    if tmp_sql_pos > 0 and (tmp_sql[tmp_sql_pos-1].count('(') != tmp_sql[tmp_sql_pos-1].count(')')
+                                            or tmp_sql[tmp_sql_pos-1].count('[') != tmp_sql[tmp_sql_pos-1].count(']')):
                         tmp_sql[tmp_sql_pos] = tmp_sql[tmp_sql_pos-1] + ' ' + tmp_sql[tmp_sql_pos]
                         # 跳过上次括号不齐，留到下次合并处理
-                        if tmp_sql[tmp_sql_pos].count('(') == tmp_sql[tmp_sql_pos].count(')') and tmp_sql[tmp_sql_pos].count('[') == tmp_sql[tmp_sql_pos].count(']'):
+                        if tmp_sql[tmp_sql_pos].count('(') == tmp_sql[tmp_sql_pos].count(')') \
+                                and tmp_sql[tmp_sql_pos].count('[') == tmp_sql[tmp_sql_pos].count(']'):
                             tmp.append(tmp_sql[tmp_sql_pos])
-                    elif tmp_sql[tmp_sql_pos].count('(') == tmp_sql[tmp_sql_pos].count(')') and tmp_sql[tmp_sql_pos].count('[') == tmp_sql[tmp_sql_pos].count(']'):
+                    elif tmp_sql[tmp_sql_pos].count('(') == tmp_sql[tmp_sql_pos].count(')') \
+                            and tmp_sql[tmp_sql_pos].count('[') == tmp_sql[tmp_sql_pos].count(']'):
                         tmp.append(tmp_sql[tmp_sql_pos])
                     else:
                         pass
@@ -90,7 +101,9 @@ def sql_split(sql):
                     # case when 特别处理
                     # 20190322 wq 1.when/else换行 2.else后跟低于10个字符 end不换行
                     if re.search('case', tmp[tmp_pos]):
-                        tmp_case = [i[0] for i in re.findall(r'((.*?(case\s)?when|else\s.{10,}(?=\send\s)|(\selse\s.{0,10})?end|end).*?(?=\s(when|else|end)\s|$))', tmp[tmp_pos])]
+                        tmp_case = [i[0] for i in re.findall(r'((.*?(case\s)?when|else\s.{10,}(?=\send\s)|'
+                                                             r'(\selse\s.{0,10})?end|end).*?(?=\s(when|else|end)\s|$))',
+                                                             tmp[tmp_pos])]
                         case_pos = 0
                         for tmp_case_pos in range(len(tmp_case)):
                             if tmp_case_pos == 0:
@@ -104,14 +117,16 @@ def sql_split(sql):
                         pass
                 exec_sql[exec_sql_pos] = tmp
             elif first_value in ('on', 'where', 'having'):
-                tmp = [i[0] for i in re.findall(r'(\s*(where|on|having|and|or)\s.*?(?=\s(and|or|on|where|having)\s|$))', exec_sql_value)]
+                tmp = [i[0] for i in re.findall(r'(\s*(where|on|having|and|or)\s.*?(?=\s(and|or|on|where|having)\s|$))'
+                                                , exec_sql_value)]
                 for tmp_pos in range(len(tmp)):
                     first_value_2 = re.match(r'^\s*(\w*)\s*', tmp[tmp_pos]).group(1)
                     tmp[tmp_pos] = re.sub(r'^\s*(\w*)\s*', first_value_2.rjust(6) + 2 * " ", tmp[tmp_pos])
                 exec_sql[exec_sql_pos] = tmp
             else:
                 if first_value != ')':
-                    exec_sql[exec_sql_pos] = re.sub('^\s*(--|\w*)\s*', first_value.rjust(6) + 2 * " ", re.sub('\s*\(', ' (', exec_sql[exec_sql_pos]))
+                    exec_sql[exec_sql_pos] = re.sub('^\s*(--|\w*)\s*', first_value.rjust(6) + 2 * " ",
+                                                    re.sub('\s*\(', ' (', exec_sql[exec_sql_pos]))
                 else:
                     # exec_sql[exec_sql_pos] = 8 * " " + exec_sql[exec_sql_pos]
                     pass
@@ -135,11 +150,11 @@ def sql_format(sql):
     sql = ' ' + re.sub('\s+', ' ', sql).strip() + ' '
     # 格式化运算符，关键字转化小写（跳过单引号内的字符串）
     tmp_sql = [i[0] for i in re.findall('((\'.*?\')|([^\']*))', sql)]
-    for tmp_result_sql_pos in range(len(tmp_sql)):
-        if re.search('^\'', tmp_sql[tmp_result_sql_pos]):
+    for tmp_sql_pos in range(len(tmp_sql)):
+        if re.search('^\'', tmp_sql[tmp_sql_pos]):
             pass
         else:
-            tmp_sql[tmp_result_sql_pos] = tmp_sql[tmp_result_sql_pos].lower()
+            tmp_sql[tmp_sql_pos] = tmp_sql[tmp_sql_pos].lower()
             for pattern_atom in ['\[', '\(', '\]', ',', '\)', '\+', '-', '\*', '/', '=', '<', '>']:
                 pattern = '[ ]*{0}[ ]*'.format(pattern_atom)
                 if pattern_atom in ('\[', '\('):
@@ -153,24 +168,30 @@ def sql_format(sql):
                     repl_str = ' - '
                 else:
                     pass
-                tmp_sql[tmp_result_sql_pos] = re.sub(pattern, repl_str, tmp_sql[tmp_result_sql_pos])
+                tmp_sql[tmp_sql_pos] = re.sub(pattern, repl_str, tmp_sql[tmp_sql_pos])
             # 20190321 wq 优化符号的处理，例如"100 * -1"
-            tmp_sql[tmp_result_sql_pos] = re.sub('(?<=\[|\]|,|\(|\))\s*(?=\[|\]|,|\(|\))', '', tmp_sql[tmp_result_sql_pos])
-            tmp_sql[tmp_result_sql_pos] = re.sub('(?<==|<|>)\s*(?==|<|>)', '', tmp_sql[tmp_result_sql_pos])
+            tmp_sql[tmp_sql_pos] = re.sub('(?<=\[|\]|,|\(|\))\s*(?=\[|\]|,|\(|\))', '', tmp_sql[tmp_sql_pos])
+            tmp_sql[tmp_sql_pos] = re.sub('(?<==|<|>)\s*(?==|<|>)', '', tmp_sql[tmp_sql_pos])
             # 字段中符号开头
-            tmp_sql[tmp_result_sql_pos] = re.sub('(?<=,\s(\+|-))\s*(?!-)', '', tmp_sql[tmp_result_sql_pos])
-            tmp_sql[tmp_result_sql_pos] = re.sub('(?<=(\+|-|\*|/|=|<|>)\s(\+|-))\s*', '', tmp_sql[tmp_result_sql_pos])
+            tmp_sql[tmp_sql_pos] = re.sub('(?<=,\s(\+|-))\s*(?!-)', '', tmp_sql[tmp_sql_pos])
+            tmp_sql[tmp_sql_pos] = re.sub('(?<=(\+|-|\*|/|=|<|>)\s(\+|-))\s*', '', tmp_sql[tmp_sql_pos])
             # 20190326 wq 修复子查询的问题
-            tmp_sql[tmp_result_sql_pos] = tmp_sql[tmp_result_sql_pos].replace('(--', '( --').replace('(select ', '( select ')
+            tmp_sql[tmp_sql_pos] = tmp_sql[tmp_sql_pos].replace('(--', '( --')\
+                .replace('(select ', '( select ')
     tmp_sql = ''.join(tmp_sql)
     # 20190312 wq 关键字后直接接左括号
-    tmp_sql = re.sub('((?<=\sselect)|(?<=\sfrom)|(?<=\sjoin)|(?<=\son)|(?<=\swhere)|(?<=\sby)|(?<=\shaving)|(?<=\sas)|(?<=\sin))\(', ' (', tmp_sql)
+    tmp_sql = re.sub('((?<=\sselect)|(?<=\sfrom)|(?<=\sjoin)|(?<=\son)|'
+                     '(?<=\swhere)|(?<=\sby)|(?<=\shaving)|(?<=\sas)|(?<=\sin))\(', ' (', tmp_sql)
     # 按括号添加前缀空格
     split_sql = sql_split(tmp_sql)
     table_list = []
+    with_table_list = []
+    # 20190328 wq 获取from后的表，再与with/as的自定义表名对比，剔除
     for split_sql_value in split_sql:
-        if re.match('^\s*from\s+[^\(]+$', split_sql_value) is not None:
-            table_list.append(re.match('^\s*from\s+([^\(]+)$', split_sql_value).group(1))
+        if re.match('^\s*from\s+[^\(]+$', split_sql_value):
+            table_list.append(re.match('^\s*from\s+(.+?)(?=--|\s|$)', split_sql_value).group(1))
+        elif re.match('^\s*\swith.*?\(|[^,]*as\s*\(', split_sql_value):
+            with_table_list.append(re.search('((?<=with)\s+[^\s]+|[^\s]+(?=\s+as))', split_sql_value).group(1).strip())
         else:
             pass
         if re.match(r'^\s*$', split_sql_value):
@@ -184,6 +205,9 @@ def sql_format(sql):
             pass
     for note_pos in range(len(notes_encode)):
         result_sql = re.sub('--\s*' + notes_encode[note_pos], notes[note_pos], result_sql)
+    for with_table in with_table_list:
+        if with_table in table_list:
+            table_list.remove(with_table)
     return [result_sql, table_list]
 
 
@@ -192,7 +216,9 @@ def comma_trans(sql):
     逗号前置
     :param sql:string/待处理sql
     """
-    sql = re.sub('\s{4}(?!(with|as|select|from|left|right|full|inner|cross|join|on|where|group|order|limit|having|union|insert|create|when|else|end|and|or)\s)(?=\w)', '    ,', re.sub(',(?=(\s*--\s*[^\s]*)?\r\n)', '', sql))
+    sql = re.sub('\s{4}(?!(with|as|select|from|left|right|full|inner|cross|join|on|'
+                 'where|group|order|limit|having|union|insert|create|when|else|end|and|or)\s)(?=\w)',
+                 '    ,', re.sub(',(?=(\s*--\s*[^\s]*)?\r\n)', '', sql))
     return sql
 
 
@@ -200,19 +226,24 @@ def comma_trans(sql):
 
 # exec_sql = [
 #     """
+#     with sdsss as (select 123), sdfsdf as (select 123)
 #     /*dddd
 #     dddd*/
-# 		select renewal_policy_uuid
-# 		 from baoxian.baoxian.sales_insure_policy_renewal_withhold
+# 		select renewal_policy_uuid,
+# 		rank() over (partition by 1 order by 123)
+# 		 from baoxian.baoxian.sales_insure_policy_renewal_withhold a
 #          /*ddd
 #          sss*/
+# 		 left join (select 123) on 1=1
 # 		 where withhold_status in (200,100)
 # 		 -- and renewal_withhold_enable = true
+# 		 from sdsss
 #     """
 # ]
 # for exec_sql_vaule in exec_sql:
-#     print(exec_sql_vaule)
+#     # print(exec_sql_vaule)
 #     print("------------------------无情分割线-----------------------")
 #     format_sql = sql_format(exec_sql_vaule)
 #     print(format_sql[0])
+#     print(format_sql[1])
 #     # print(comma_trans(format_sql))
