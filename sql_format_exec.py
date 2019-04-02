@@ -11,6 +11,7 @@
 20190326 wq 1.修复关键字遗留问题 2.增加返回表名 3.join中含outer 4.子查询中左括号直接跟select(1.10)
 20190327 wq 1.修复两类注释问题 --，/* */(1.11)
 20190328 wq 1.调整格式 2.优化表名获取(剔除自定义表名)(1.12)
+20190402 wq 1.获取表名：增加join的判断
 """
 
 import re
@@ -187,9 +188,10 @@ def sql_format(sql):
     table_list = []
     with_table_list = []
     # 20190328 wq 获取from后的表，再与with/as的自定义表名对比，剔除
+    # 20190402 wq 1.获取表名：增加join的判断
     for split_sql_value in split_sql:
-        if re.match('^\s*from\s+[^\(]+$', split_sql_value):
-            table_list.append(re.match('^\s*from\s+(.+?)(?=--|\s|$)', split_sql_value).group(1))
+        if re.match('^\s*(from|((left|right|full|inner|cross)\s+(outer\s+)?)?join)\s+[^\(]+$', split_sql_value):
+            table_list.append(re.search('(from|join)\s+(.+?)(?=--|\s|$)', split_sql_value).group(2))
         elif re.match('^\s*\swith.*?\(|[^,]*as\s*\(', split_sql_value):
             with_table_list.append(re.search('((?<=with)\s+[^\s]+|[^\s]+(?=\s+as))', split_sql_value).group(1).strip())
         else:
@@ -235,6 +237,8 @@ def comma_trans(sql):
 #          /*ddd
 #          sss*/
 # 		 left join (select 123) on 1=1
+# 		 left join 11111
+# 		 join 321312
 # 		 where withhold_status in (200,100)
 # 		 -- and renewal_withhold_enable = true
 # 		 from sdsss
@@ -244,6 +248,6 @@ def comma_trans(sql):
 #     # print(exec_sql_vaule)
 #     print("------------------------无情分割线-----------------------")
 #     format_sql = sql_format(exec_sql_vaule)
-#     print(format_sql[0])
+#     # print(format_sql[0])
 #     print(format_sql[1])
-#     # print(comma_trans(format_sql))
+#     # print(comma_trans(format_sql[0]))
