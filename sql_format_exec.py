@@ -12,6 +12,7 @@
 20190327 wq 1.修复两类注释问题 --，/* */(1.11)
 20190328 wq 1.调整格式 2.优化表名获取(剔除自定义表名)(1.12)
 20190402 wq 1.获取表名：增加join的判断
+20190404 wq 去掉重复表名
 """
 
 import re
@@ -186,14 +187,14 @@ def sql_format(sql):
     # 按括号添加前缀空格
     split_sql = sql_split(tmp_sql)
     table_list = []
-    with_table_list = []
+    custom_table_list = []
     # 20190328 wq 获取from后的表，再与with/as的自定义表名对比，剔除
     # 20190402 wq 1.获取表名：增加join的判断
     for split_sql_value in split_sql:
         if re.match('^\s*(from|((left|right|full|inner|cross)\s+(outer\s+)?)?join)\s+[^\(]+$', split_sql_value):
             table_list.append(re.search('(from|join)\s+(.+?)(?=--|\s|$)', split_sql_value).group(2))
         elif re.match('^\s*\swith.*?\(|[^,]*as\s*\(', split_sql_value):
-            with_table_list.append(re.search('((?<=with)\s+[^\s]+|[^\s]+(?=\s+as))', split_sql_value).group(1).strip())
+            custom_table_list.append(re.search('((?<=with)\s+[^\s]+|[^\s]+(?=\s+as))', split_sql_value).group(1).strip())
         else:
             pass
         if re.match(r'^\s*$', split_sql_value):
@@ -207,9 +208,12 @@ def sql_format(sql):
             pass
     for note_pos in range(len(notes_encode)):
         result_sql = re.sub('--\s*' + notes_encode[note_pos], notes[note_pos], result_sql)
-    for with_table in with_table_list:
-        if with_table in table_list:
-            table_list.remove(with_table)
+    # 20190404 wq 去掉重复表名
+    custom_table_list = set(custom_table_list)
+    table_list = set(table_list)
+    for custom_table in custom_table_list:
+        if custom_table in table_list:
+            table_list.remove(custom_table)
     return [result_sql, table_list]
 
 
@@ -228,20 +232,11 @@ def comma_trans(sql):
 
 # exec_sql = [
 #     """
-#     with sdsss as (select 123), sdfsdf as (select 123)
-#     /*dddd
-#     dddd*/
-# 		select renewal_policy_uuid,
-# 		rank() over (partition by 1 order by 123)
-# 		 from baoxian.baoxian.sales_insure_policy_renewal_withhold a
-#          /*ddd
-#          sss*/
-# 		 left join (select 123) on 1=1
-# 		 left join 11111
-# 		 join 321312
-# 		 where withhold_status in (200,100)
-# 		 -- and renewal_withhold_enable = true
-# 		 from sdsss
+# with user_data as (select 123)
+# user_date_2 as (select 321 from wq_date_2)
+# select *
+#   from user_data
+# left join user_data
 #     """
 # ]
 # for exec_sql_vaule in exec_sql:
