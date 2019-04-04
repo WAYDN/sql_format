@@ -209,8 +209,8 @@ def sql_format(sql):
     for note_pos in range(len(notes_encode)):
         result_sql = re.sub('--\s*' + notes_encode[note_pos], notes[note_pos], result_sql)
     # 20190404 wq 去掉重复表名
-    custom_table_list = set(custom_table_list)
-    table_list = set(table_list)
+    custom_table_list = list(set(custom_table_list))
+    table_list = list(set(table_list))
     for custom_table in custom_table_list:
         if custom_table in table_list:
             table_list.remove(custom_table)
