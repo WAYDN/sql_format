@@ -1,6 +1,24 @@
 # sql_format
 The main thrust of this project is to standardize the SQL format.
 
+#### 应用介绍
+SQL格式化工具，为了更优美的sql代码
+```
+select  a.user_id,
+        a.name
+  from  (
+        select  user_id,
+                trim(name) as name,--中文名字
+                row_number() over(partition on by user_id order by time desc) as rn,
+                case when 1 = 1 then end_date
+                     else start_date end,
+                col1
+          from  db_test.test
+         where  regexp_like(trim(name), '^[\u4E00-\u9FA5]+$')
+        ) a
+ where  rn = 1
+```
+
 #### 图标
 ![sql_format](https://github.com/WAYDN/sql_format/blob/master/sql_format.ico)
 
