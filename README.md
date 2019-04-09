@@ -2,7 +2,7 @@
 The main thrust of this project is to standardize the SQL format.
 
 #### 图标
-![sql_format](https://github.com/WAYDN/sql_format/sql_format.ico)
+![sql_format](https://github.com/WAYDN/sql_format/blob/master/sql_format.ico)
 
 #### 开发环境
 python3.6
