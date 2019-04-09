@@ -43,7 +43,9 @@ select  a.user_id,
   from  (
         select  user_id,
                 trim(name) as name,--中文名字
-                row_number() over (partiti  on by user_id  order by apply_time desc) as rn
+                row_number() over (partiti  on by user_id  order by apply_time desc) as rn,
+                case when 1=1 then endddd else appendas end,
+                test
           from  ods.ods_chain_store_user_auth
          where  regexp_like(trim(name), '^[\u4E00-\u9FA5]+$')
         ) a
@@ -71,11 +73,7 @@ def button_leave(event):
 def exec_format(event):
     source_sql = sql_text.GetValue()
     try:
-        sql = sql_format_exec.sql_format(source_sql)[0]
-        if comma_menu.IsChecked():
-            sql_text.SetValue(sql_format_exec.comma_trans(sql))
-        else:
-            sql_text.SetValue(sql)
+        sql_text.SetValue(sql_format_exec.sql_format(source_sql, comma_menu.IsChecked())[0])
     except:
         sql_text.SetValue("调用出现问题")
 
