@@ -15,6 +15,8 @@ python3.6
 - version_info.txt
 - \_\_init\_\_.py
 
+#### 迭代计划
+- [ ] 兼容hive关键字：lateral view
 
 #### 版本迭代信息
 - 2.1
