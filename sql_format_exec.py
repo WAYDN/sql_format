@@ -13,7 +13,8 @@
 20190328 wq 1.调整格式 2.优化表名获取(剔除自定义表名)(1.12)
 20190402 wq 1.获取表名：增加join的判断
 20190404 wq 去掉重复表名
-20190409 wq 1.重构逗号前置功能2.修复case中else后超10位的格式处理(2.1)
+20190409 wq 1.重构逗号前置功能 2.修复case中else后超10位的格式处理(2.1)
+20190410 wq 1.符号处理中增加'!'的处理 2.修复case when中end的空格处理 3.去掉原sql中前置逗号带来的注释结尾所带的逗号（2.1.1）
 """
 
 import re
@@ -98,7 +99,7 @@ def sql_split(sql, is_comma_trans=False):
                 for tmp_pos in range(len(tmp)):
                     # 20190321 wq 修复逗号前置和字段中含注释所导致的错误（逗号被注释掉）
                     if re.search('[^,]+--.*,$', tmp[tmp_pos]) is not None:
-                        tmp[tmp_pos] = re.sub(r'(?<=[^,])\s*--', ', --', tmp[tmp_pos])
+                        tmp[tmp_pos] = re.sub(',$', '', re.sub(r'(?<=[^,])\s*--', ', --', tmp[tmp_pos]))
                     if tmp_pos == 0:
                         if is_comma_trans is True:
                             tmp[tmp_pos] = re.sub(r',(?=\s*(--.*)?$)', '', tmp[tmp_pos])
@@ -111,7 +112,7 @@ def sql_split(sql, is_comma_trans=False):
                     # 20190322 wq 1.when/else换行 2.else后跟低于10个字符 end不换行
                     if re.search(',?case', tmp[tmp_pos]):
                         tmp_case = [i[0] for i in re.findall(r'((.*?(,?case\s)?when|else\s.{10,}(?=\send)|'
-                                                             r'( else\s.{0,10})? end|end).*?(?=\s(when|else|end)\s|$))',
+                                                             r' else\s.{0,10} end|end).*?(?=\s(when|else|end)\s|$))',
                                                              tmp[tmp_pos])]
                         case_pos = 0
                         for tmp_case_pos in range(len(tmp_case)):
@@ -126,8 +127,8 @@ def sql_split(sql, is_comma_trans=False):
                         pass
                 exec_sql[exec_sql_pos] = tmp
             elif first_value in ('on', 'where', 'having'):
-                tmp = [i[0] for i in re.findall(r'(\s*(where|on|having|and|or)\s.*?(?=\s(and|or|on|where|having)\s|$))'
-                                                , exec_sql_value)]
+                tmp = [i[0] for i in re.findall(r'(\s*(where|on|having|and|or)\s.*?(?=\s(and|or|on|where|having)\s|$))',
+                                                exec_sql_value)]
                 for tmp_pos in range(len(tmp)):
                     first_value_2 = re.match(r'^\s*(\w*)\s*', tmp[tmp_pos]).group(1)
                     tmp[tmp_pos] = re.sub(r'^\s*(\w*)\s*', first_value_2.rjust(6) + 2 * " ", tmp[tmp_pos])
@@ -165,13 +166,13 @@ def sql_format(sql, is_comma_trans=False):
             pass
         else:
             tmp_sql[tmp_sql_pos] = tmp_sql[tmp_sql_pos].lower()
-            for pattern_atom in [r'\[', r'\(', r'\]', ',', r'\)', r'\+', '-', r'\*', '/', '=', '<', '>']:
+            for pattern_atom in [r'\[', r'\(', r'\]', ',', r'\)', r'\+', '-', r'\*', '/', '=', '<', '>', '!']:
                 pattern = '[ ]*{0}[ ]*'.format(pattern_atom)
                 if pattern_atom in (r'\[', r'\('):
                     repl_str = re.sub(r'\\', '', pattern_atom)
                 elif pattern_atom in [r'\]', ',', r'\)']:
                     repl_str = re.sub(r'\\', '', pattern_atom) + ' '
-                elif pattern_atom in [r'\+', r'\*', '/', '=', '<', '>']:
+                elif pattern_atom in [r'\+', r'\*', '/', '=', '<', '>', '!']:
                     repl_str = ' ' + re.sub(r'\\', '', pattern_atom) + ' '
                 elif pattern_atom == '-':
                     pattern = '[ ]*(?<!-)-(?!-)[ ]*'
@@ -181,7 +182,7 @@ def sql_format(sql, is_comma_trans=False):
                 tmp_sql[tmp_sql_pos] = re.sub(pattern, repl_str, tmp_sql[tmp_sql_pos])
             # 20190321 wq 优化符号的处理，例如"100 * -1"
             tmp_sql[tmp_sql_pos] = re.sub(r'(?<=\[|\]|,|\(|\))\s*(?=\[|\]|,|\(|\))', '', tmp_sql[tmp_sql_pos])
-            tmp_sql[tmp_sql_pos] = re.sub(r'(?<==|<|>)\s*(?==|<|>)', '', tmp_sql[tmp_sql_pos])
+            tmp_sql[tmp_sql_pos] = re.sub(r'(?<=!|=|<|>)\s*(?=!|=|<|>)', '', tmp_sql[tmp_sql_pos])
             # 字段中符号开头
             tmp_sql[tmp_sql_pos] = re.sub(r'(?<=,\s(\+|-))\s*(?!-)', '', tmp_sql[tmp_sql_pos])
             tmp_sql[tmp_sql_pos] = re.sub(r'(?<=(\+|-|\*|/|=|<|>)\s(\+|-))\s*', '', tmp_sql[tmp_sql_pos])
@@ -233,10 +234,16 @@ if __name__ == '__main__':
     select 1,2,3
       from user_data a 
       left join (select 1,2,3,             --sdfsdfs
-      4, case when 1=1 then 1 else 12312412433213213 end,5) b 
+      4, case when 1=1 then 1 else 12312412433213213 end as dffffffff,5) b 
         on 1=1
+        and 2!= 2
     left join user_data c 
     on 2=2
+    left join (
+    select 1 --test
+            ,2 --test
+        ) d 
+    on 1=2
         """
     ]
     for exec_sql_vaule in exec_sql:
