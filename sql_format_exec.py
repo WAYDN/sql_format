@@ -15,6 +15,7 @@
 20190404 wq 去掉重复表名
 20190409 wq 1.重构逗号前置功能 2.修复case中else后超10位的格式处理(2.1)
 20190410 wq 1.符号处理中增加'!'的处理 2.修复case when中end的空格处理 3.去掉原sql中前置逗号带来的注释结尾所带的逗号（2.1.1）
+20190423 wq 1.函数内注释修复：强制插入换行 2.兼容hive关键字：lateral view（2.1.2）
 """
 
 import re
@@ -44,13 +45,14 @@ def sql_split(sql, is_comma_trans=False):
     """
     # 分割sql, 结尾加\s 防止将非关键字给分割了 例如pdw_fact_person_insure中的on
     # 20190326 wq 在关键字前后增加\s，防止将非关键字给分割了，例如sql_from中的from
+
     split_sql = re.findall(r'(((^(\s*--\s*[^\s]*)+|\swith.*?\(|[^,]*as\s*\()|'
                            r'(select|from|((left|right|full|inner|cross)\s(outer\s)?)?join|'
-                           r'on|where|group|order|limit|having|union|insert|create)\s)'
+                           r'on|where|group|order|limit|having|union|insert|create|lateral\sview)\s)'
                            r'.*?'
                            r'(?=\s+(with.*?\(|[^,]*as\s*\()|'
                            r'\s(select|from|((left|right|full|inner|cross)\s(outer\s)?)?join\(?|'
-                           r'on|where|group|order|limit|having|union|insert|create)\s|$))', sql)
+                           r'on|where|group|order|limit|having|union|insert|create|lateral\sview)\s|$))', sql)
     split_sql_list = [split_sql_value[0].lstrip() for split_sql_value in split_sql]
     # 20190319 wq 消除窗口函数中order等字段中含关键字的影响,将select到from或select整合在一起
     split_sql_list_pos = 0
@@ -133,6 +135,9 @@ def sql_split(sql, is_comma_trans=False):
                     first_value_2 = re.match(r'^\s*(\w*)\s*', tmp[tmp_pos]).group(1)
                     tmp[tmp_pos] = re.sub(r'^\s*(\w*)\s*', first_value_2.rjust(6) + 2 * " ", tmp[tmp_pos])
                 exec_sql[exec_sql_pos] = tmp
+            # 20190423 wq 兼容hive关键字：lateral view
+            elif first_value == 'lateral':
+                exec_sql[exec_sql_pos] = re.sub(r'^\s*(\w*)\s*', 'lateral ', exec_sql[exec_sql_pos])
             else:
                 if first_value != ')':
                     exec_sql[exec_sql_pos] = re.sub(r'^\s*(--|\w*)\s*', first_value.rjust(6) + 2 * " ",
@@ -157,7 +162,8 @@ def sql_format(sql, is_comma_trans=False):
     notes = [i[0] for i in re.findall(r'(\s*(--.*?(?=\r?\n)|/\*(.|\n)*?\*/))', sql)]
     notes_encode = ['w' + str(random.randint(1000000, 10000000)) + 'q' for i in notes]
     for note_pos in range(len(notes)):
-        sql = sql.replace(notes[note_pos], '--' + notes_encode[note_pos])
+        sql = re.sub(notes[note_pos] + r'(?=\W)', '--' + notes_encode[note_pos], sql)
+    # 统一空白符
     sql = ' ' + re.sub(r'\s+', ' ', sql).strip() + ' '
     # 格式化运算符，关键字转化小写（跳过单引号内的字符串）
     tmp_sql = [i[0] for i in re.findall('((\'.*?\')|([^\']*))', sql)]
@@ -215,7 +221,12 @@ def sql_format(sql, is_comma_trans=False):
             level -= 1
         else:
             pass
+    # 20190423 wq 函数内注释修复：强制插入换行
     for note_pos in range(len(notes_encode)):
+        if re.search(notes_encode[note_pos] + "\r\n", result_sql) is not None:
+            pass
+        else:
+            notes[note_pos] = notes[note_pos] + "\r\n"
         result_sql = re.sub(r'\s*--\s*' + notes_encode[note_pos], notes[note_pos], result_sql)
     # 20190404 wq 去掉重复表名
     custom_table_list = list(set(custom_table_list))
@@ -231,7 +242,11 @@ if __name__ == '__main__':
         """
     with user_data as (select 123),
     user_date_2 as (select 321 from wq_date_2)
-    select 1,2,3
+    select 1,2,array(
+    1,--dsf
+    2,--dsfs
+    3
+    )
       from user_data a 
       left join (select 1,2,3,             --sdfsdfs
       4, case when 1=1 then 1 else 12312412433213213 end as dffffffff,5) b 
@@ -241,7 +256,7 @@ if __name__ == '__main__':
     on 2=2
     left join (
     select 1 --test
-            ,2 --test
+            ,2 --tests
         ) d 
     on 1=2
         """
