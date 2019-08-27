@@ -27,8 +27,8 @@ python3.6
 
 #### 目录结构
 - .gitignore
-- sql_format_gui.py
-- sql_format_exec.py
+- sql_format_gui.py <!--GUI界面-->
+- sql_format_exec.py<!--实际执行文件-->
 - sql_format.ico
 - version_info.txt
 - \_\_init\_\_.py
