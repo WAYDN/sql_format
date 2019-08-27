@@ -50,10 +50,10 @@ def sql_split(sql, is_comma_trans=False):
 
     split_sql = re.findall(r'(((^(\s*--\s*[^\s]*)+|\swith.*?\(|[^,]*as\s*\()|'
                            r'(select|from|((left|right|full|inner|cross)\s(outer\s)?)?join|'
-                           r'on|where|group|order|limit|having|union(\sall)?|insert|create|lateral\sview)\s)'
+                           r'on|where|group|order|limit|having|union(\sall)?|insert|create|lateral\sview))'
                            r'.*?'
                            r'(?=\s+(with.*?\(|[^,]*as\s*\()|'
-                           r'(select|from|((left|right|full|inner|cross)\s(outer\s)?)?join\(?|'
+                           r'\s(select|from|((left|right|full|inner|cross)\s(outer\s)?)?join\(?|'
                            r'on|where|group|order|limit|having|union(\sall)?|insert|create|lateral\sview)\s|$))', sql)
     split_sql_list = [split_sql_value[0].lstrip() for split_sql_value in split_sql]
     # 20190319 wq 消除窗口函数中order等字段中含关键字的影响,将select到from或select整合在一起
@@ -248,17 +248,20 @@ def sql_format(sql, is_comma_trans=False):
 if __name__ == '__main__':
     exec_sql = [
         """
-    with user_data as (select 123),
+    with user_data as (select 123 union all select array(1,2,3)),
     user_date_2 as (select array(
     1,--dsf
     2,--dsfs
     3
     ) from wq_date_2)
+    insert overwrite table pdw.dim_tag_information
     select 1,2,array(
     1,--dsf
     2,--dsfs
-    3
-    )
+    3 
+    ), 
+    -- 校验关键字位置的错误
+    online_date, stady_on_info
       from user_data a 
       left join (select 1,2,3,             --sdfsdfs
       4, case when 1=1 then 1 else 12312412433213213 end as dffffffff,5) b 
