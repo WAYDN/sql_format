@@ -73,35 +73,37 @@ def button_leave(event):
 def exec_format(event):
     source_sql = sql_text.GetValue()
     try:
-        sql_text.SetValue(sql_format_exec.sql_format(source_sql, comma_menu.IsChecked())[0])
-    except:
-        sql_text.SetValue("调用出现问题")
+        result_sql = sql_format_exec.sql_format(source_sql, comma_menu.IsChecked())[0]
+        sql_text.SetValue(result_sql)
+    except Exception as a:
+        sql_text.SetValue("调用出现问题:{0}".format(a))
 
 
 button.Bind(wx.EVT_ENTER_WINDOW, button_enter)
 button.Bind(wx.EVT_LEAVE_WINDOW, button_leave)
 button.Bind(wx.EVT_BUTTON, exec_format)
 
-def eventMenu(event):
-    id = event.GetId()
-    if id == 1:
+
+def event_menu(event):
+    event_id = event.GetId()
+    if event_id == 1:
         dlg = wx.FontDialog()
         if dlg.ShowModal() == wx.ID_OK:
             data = dlg.GetFontData()
             sql_text.StyleSetFont(0, data.GetChosenFont())
         dlg.Destroy()
-    elif id == 2:
+    elif event_id == 2:
         sql_text.SetViewWhiteSpace(show_space_menu.IsChecked())
         sql_text.SetWhitespaceForeground(True, 'Red')
         sql_text.SetWhitespaceSize(2)
-    elif id == 3:
+    elif event_id == 3:
         if wrap_menu.IsChecked():
             sql_text.SetWrapMode(1)
         else:
             sql_text.SetWrapMode(0)
-set_menu.Bind(wx.EVT_MENU, eventMenu)
 
 
+set_menu.Bind(wx.EVT_MENU, event_menu)
 v_box = wx.BoxSizer(wx.VERTICAL)
 v_box.Add(sql_text, proportion=1, flag=wx.EXPAND)
 v_box.Add(button, proportion=0, flag=wx.ALIGN_CENTER | wx.ALL, border=5)
