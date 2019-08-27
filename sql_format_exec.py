@@ -16,10 +16,12 @@
 20190409 wq 1.重构逗号前置功能 2.修复case中else后超10位的格式处理(2.1)
 20190410 wq 1.符号处理中增加'!'的处理 2.修复case when中end的空格处理 3.去掉原sql中前置逗号带来的注释结尾所带的逗号（2.1.1）
 20190423 wq 1.函数内注释修复：强制插入换行 2.兼容hive关键字：lateral view（2.1.2）
+20190827 wq 1.函数内注释修复导致的格式错误 2.修复union的换行（2.2）
 """
 
 import re
 import random
+
 
 def list_remake(l):
     """
@@ -48,17 +50,17 @@ def sql_split(sql, is_comma_trans=False):
 
     split_sql = re.findall(r'(((^(\s*--\s*[^\s]*)+|\swith.*?\(|[^,]*as\s*\()|'
                            r'(select|from|((left|right|full|inner|cross)\s(outer\s)?)?join|'
-                           r'on|where|group|order|limit|having|union|insert|create|lateral\sview)\s)'
+                           r'on|where|group|order|limit|having|union(\sall)?|insert|create|lateral\sview)\s)'
                            r'.*?'
                            r'(?=\s+(with.*?\(|[^,]*as\s*\()|'
-                           r'\s(select|from|((left|right|full|inner|cross)\s(outer\s)?)?join\(?|'
-                           r'on|where|group|order|limit|having|union|insert|create|lateral\sview)\s|$))', sql)
+                           r'(select|from|((left|right|full|inner|cross)\s(outer\s)?)?join\(?|'
+                           r'on|where|group|order|limit|having|union(\sall)?|insert|create|lateral\sview)\s|$))', sql)
     split_sql_list = [split_sql_value[0].lstrip() for split_sql_value in split_sql]
     # 20190319 wq 消除窗口函数中order等字段中含关键字的影响,将select到from或select整合在一起
     split_sql_list_pos = 0
     while split_sql_list_pos < len(split_sql_list)-1 and len(split_sql_list) > 1:
         if re.search(r'^select(?![^\(]+\))', split_sql_list[split_sql_list_pos]) \
-                and not re.search('^(from|select)', split_sql_list[split_sql_list_pos+1]):
+                and not re.search('^(from|select|union) ', split_sql_list[split_sql_list_pos+1]):
             split_sql_list[split_sql_list_pos] += ' ' + split_sql_list[split_sql_list_pos+1]
             split_sql_list.pop(split_sql_list_pos+1)
         else:
@@ -100,15 +102,15 @@ def sql_split(sql, is_comma_trans=False):
                 # 添加字段前空格
                 for tmp_pos in range(len(tmp)):
                     # 20190321 wq 修复逗号前置和字段中含注释所导致的错误（逗号被注释掉）
-                    if re.search('[^,]+--.*,$', tmp[tmp_pos]) is not None:
+                    if re.search(r'[^,]+--w\d+q,$', tmp[tmp_pos]) is not None:
                         tmp[tmp_pos] = re.sub(',$', '', re.sub(r'(?<=[^,])\s*--', ', --', tmp[tmp_pos]))
                     if tmp_pos == 0:
                         if is_comma_trans is True:
-                            tmp[tmp_pos] = re.sub(r',(?=\s*(--.*)?$)', '', tmp[tmp_pos])
+                            tmp[tmp_pos] = re.sub(r',(?=\s*(--w\d+q)?$)', '', tmp[tmp_pos])
                         tmp[tmp_pos] = re.sub(r'^\s*(\w*)\s*', first_value.rjust(6) + 2 * " ", tmp[tmp_pos])
                     else:
                         if is_comma_trans is True and tmp[tmp_pos] != '':
-                            tmp[tmp_pos] = ',' + re.sub(r',(?=\s*(--.*)?$)', '', tmp[tmp_pos])
+                            tmp[tmp_pos] = ',' + re.sub(r',(?=\s*(--w\d+q)?$)', '', tmp[tmp_pos])
                         tmp[tmp_pos] = 8 * " " + tmp[tmp_pos]
                     # case when 特别处理
                     # 20190322 wq 1.when/else换行 2.else后跟低于10个字符 end不换行
@@ -162,7 +164,7 @@ def sql_format(sql, is_comma_trans=False):
     notes = [i[0] for i in re.findall(r'(\s*(--.*?(?=\r?\n)|/\*(.|\n)*?\*/))', sql)]
     notes_encode = ['w' + str(random.randint(1000000, 10000000)) + 'q' for i in notes]
     for note_pos in range(len(notes)):
-        sql = re.sub(notes[note_pos] + r'(?=\W)', '--' + notes_encode[note_pos], sql)
+        sql = re.sub(notes[note_pos] + r'(?=\W)', '--' + notes_encode[note_pos], sql, 1)
     # 统一空白符
     sql = ' ' + re.sub(r'\s+', ' ', sql).strip() + ' '
     # 格式化运算符，关键字转化小写（跳过单引号内的字符串）
@@ -226,7 +228,13 @@ def sql_format(sql, is_comma_trans=False):
         if re.search(notes_encode[note_pos] + "\r\n", result_sql) is not None:
             pass
         else:
-            notes[note_pos] = notes[note_pos] + "\r\n"
+            # 20190827 wq 修复字段内的注释
+            if re.search(r'( {6,}.*?)\(.*?--' + notes_encode[note_pos], result_sql) is not None:
+                space = ' ' * len(re.search(r'( {6,}.*?)\(.*?--' + notes_encode[note_pos], result_sql).group(1))
+            else:
+                space = ''
+            notes[note_pos] = notes[note_pos] + "\r\n" + space
+    for note_pos in range(len(notes_encode)):
         result_sql = re.sub(r'\s*--\s*' + notes_encode[note_pos], notes[note_pos], result_sql)
     # 20190404 wq 去掉重复表名
     custom_table_list = list(set(custom_table_list))
@@ -241,7 +249,11 @@ if __name__ == '__main__':
     exec_sql = [
         """
     with user_data as (select 123),
-    user_date_2 as (select 321 from wq_date_2)
+    user_date_2 as (select array(
+    1,--dsf
+    2,--dsfs
+    3
+    ) from wq_date_2)
     select 1,2,array(
     1,--dsf
     2,--dsfs
