@@ -16,7 +16,7 @@
 20190409 wq 1.重构逗号前置功能 2.修复case中else后超10位的格式处理(2.1)
 20190410 wq 1.符号处理中增加'!'的处理 2.修复case when中end的空格处理 3.去掉原sql中前置逗号带来的注释结尾所带的逗号（2.1.1）
 20190423 wq 1.函数内注释修复：强制插入换行 2.兼容hive关键字：lateral view（2.1.2）
-20190827 wq 1.函数内注释修复导致的格式错误 2.修复union的换行（2.2）
+20190827 wq 1.函数内注释修复导致的格式错误 2.修复union的换行 3.修复子查询中以函数结尾的分割问题（2.2）
 """
 
 import re
@@ -48,19 +48,20 @@ def sql_split(sql, is_comma_trans=False):
     # 分割sql, 结尾加\s 防止将非关键字给分割了 例如pdw_fact_person_insure中的on
     # 20190326 wq 在关键字前后增加\s，防止将非关键字给分割了，例如sql_from中的from
 
-    split_sql = re.findall(r'(((^(\s*--\s*[^\s]*)+|\swith.*?\(|[^,]*as\s*\()|'
+    split_sql = re.findall(r'(((^(\s*--\s*[^\s]*)+|with.*?\(|\w+\sas\s*\()|'
                            r'(select|from|((left|right|full|inner|cross)\s(outer\s)?)?join|'
                            r'on|where|group|order|limit|having|union(\sall)?|insert|create|lateral\sview))'
                            r'.*?'
-                           r'(?=\s+(with.*?\(|[^,]*as\s*\()|'
-                           r'\s(select|from|((left|right|full|inner|cross)\s(outer\s)?)?join\(?|'
+                           r'\s(?=(with.*?\(|\w+\sas\s*\()|'
+                           r'(select|from|((left|right|full|inner|cross)\s(outer\s)?)?join\(?|'
                            r'on|where|group|order|limit|having|union(\sall)?|insert|create|lateral\sview)\s|$))', sql)
     split_sql_list = [split_sql_value[0].lstrip() for split_sql_value in split_sql]
-    # 20190319 wq 消除窗口函数中order等字段中含关键字的影响,将select到from或select整合在一起
+    # 20190319 wq 消除窗口函数中order等字段中含关键字的影响,将select到from或select到union或select整合在一起
     split_sql_list_pos = 0
     while split_sql_list_pos < len(split_sql_list)-1 and len(split_sql_list) > 1:
         if re.search(r'^select(?![^\(]+\))', split_sql_list[split_sql_list_pos]) \
-                and not re.search('^(from|select|union) ', split_sql_list[split_sql_list_pos+1]):
+                and not re.search('^(from|select|union) ', split_sql_list[split_sql_list_pos+1])\
+                and not split_sql_list[split_sql_list_pos].count('(') < split_sql_list[split_sql_list_pos].count(')'):
             split_sql_list[split_sql_list_pos] += ' ' + split_sql_list[split_sql_list_pos+1]
             split_sql_list.pop(split_sql_list_pos+1)
         else:
@@ -248,12 +249,8 @@ def sql_format(sql, is_comma_trans=False):
 if __name__ == '__main__':
     exec_sql = [
         """
-    with user_data as (select 123 union all select array(1,2,3)),
-    user_date_2 as (select array(
-    1,--dsf
-    2,--dsfs
-    3
-    ) from wq_date_2)
+    with user_data as (select 123  union all select array(1,2,3)),
+    user_date_2 as (select row_count() over (order by 123) from wq_date_2)
     insert overwrite table pdw.dim_tag_information
     select 1,2,array(
     1,--dsf
@@ -272,13 +269,14 @@ if __name__ == '__main__':
     left join (
     select 1 --test
             ,2 --tests
+            ,count(distinct case when 1 = 1 then 1 else 0 end)
         ) d 
     on 1=2
         """
     ]
     for exec_sql_vaule in exec_sql:
-        print(exec_sql_vaule)
-        print("------------------------无情分割线-----------------------")
+        # print(exec_sql_vaule)
+        # print("------------------------无情分割线-----------------------")
         format_sql = sql_format(exec_sql_vaule, False)
         print(format_sql[0])
         print(format_sql[1])
