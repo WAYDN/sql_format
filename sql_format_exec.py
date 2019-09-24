@@ -123,8 +123,8 @@ def sql_split(sql, is_comma_trans=False):
                         # 20190924 wq 如果只有一个when的话就不对else换行
                         if len(tmp_case) < 2:
                             pass
-                        elif re.search(' else ', tmp_case[1]):
-                            tmp[tmp_pos] = ''.join(tmp_case)
+                        elif re.search(r'^\s*(else|end) ', tmp_case[1]):
+                            tmp[tmp_pos] = ' '.join(tmp_case)
                         else:
                             case_pos = 0
                             for tmp_case_pos in range(len(tmp_case)):
@@ -256,30 +256,42 @@ def sql_format(sql, is_comma_trans=False):
 if __name__ == '__main__':
     exec_sql = [
         """
-    with user_data as (select 123  union all select array(1,2,3)),
-    user_date_2 as (select row_count() over (order by 123, 'dsf
-    sdf') from wq_date_2)
-    insert overwrite table pdw.dim_tag_information
-    select 1,2,array(
-    1,--dsf
-    2,--dsfs
-    3 
-    ) as `ddd-ddd`, 
-    -- 校验关键字位置的错误
-    online_date, stady_on_info
-      from user_data a 
-      left join (select 1,2,3,             --sdfsdfs
-      4, case when 1=1 then 1 else 123 end as dffffffff,5) b 
-        on 1=1
-        and 2!= 2
-    left join user_data c 
-    on 2=2
-    left join (
-    select 1 --test
-            ,2 --tests
-            ,count(distinct case when 1 = 1 then 1 else 0 end)
-        ) d 
-    on 1=2
+select  p1.hp_stat_date as `日期`,
+        p2.is_trade_day as `是否交易日`,
+        p1.advisor_name as `圈子`,
+        p1.user_type as `用户类型`,
+        p1.total_uv as `总访问用户数`,
+        p1.total_pv as `总访问次数`,
+        p1.ssbb_uv as `实时播报页访问用户数`,
+        case when p1.total_uv > 0 then 100 * p1.ssbb_uv / p1.total_uv
+              end as `实时播报页访问占比`,
+        case when p1.ssbb_uv > 0 then p1.ssbb_pv / p1.ssbb_uv
+              end as `实时播报页人均访问次数`,
+        p1.jinguchi_uv as `金股池页访问用户数`,
+        case when p1.total_uv > 0 then 100 * p1.jinguchi_uv / p1.total_uv
+              end as `金股池页访问占比`,
+        case when p1.jinguchi_uv > 0 then p1.jinguchi_pv / p1.jinguchi_uv
+              end as `金股池页人均访问次数`,
+        p1.cpjh_uv as `操盘计划页访问用户数`,
+        case when p1.total_uv > 0 then 100 * p1.cpjh_uv / p1.total_uv
+              end as `操盘计划页访问占比`,
+        case when p1.cpjh_uv > 0 then p1.cpjh_pv / p1.cpjh_uv
+              end as `操盘计划页人均访问次数`,
+        p1.neican_uv as `内参页访问用户数`,
+        case when p1.total_uv > 0 then 100 * p1.neican_uv / p1.total_uv
+              end as `内参页访问占比`,
+        case when p1.neican_uv > 0 then p1.neican_pv / p1.neican_uv
+              end as `内参页人均访问次数`,
+        p1.zstg_uv as `专属投顾页访问用户数`,
+        case when p1.total_uv > 0 then 100 * p1.zstg_uv / p1.total_uv
+              end as `专属投顾页访问占比`,
+        case when p1.zstg_uv > 0 then p1.zstg_pv / p1.zstg_uv
+              end as `专属投顾页人均访问次数`,
+        p1.quanzi_uv as `圈子介绍页访问用户数`,
+        case when p1.total_uv > 0 then 100 * p1.quanzi_uv / p1.total_uv
+              end as `圈子介绍页访问占比`,
+        case when p1.quanzi_uv > 0 then p1.quanzi_pv / p1.quanzi_uv
+              end as `圈子介绍页人均访问次数`
         """
     ]
     for exec_sql_vaule in exec_sql:
