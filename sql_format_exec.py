@@ -17,6 +17,7 @@
 20190410 wq 1.符号处理中增加'!'的处理 2.修复case when中end的空格处理 3.去掉原sql中前置逗号带来的注释结尾所带的逗号（2.1.1）
 20190423 wq 1.函数内注释修复：强制插入换行 2.兼容hive关键字：lateral view（2.1.2）
 20190827 wq 1.函数内注释修复导致的格式错误 2.修复union的换行 3.修复子查询中以函数结尾的分割问题（2.2）
+20190924 wq 1.case when...end：如果只有一个when的话就不对else换行 2.引用内容保持原样(2.2.1)
 """
 
 import re
@@ -103,15 +104,15 @@ def sql_split(sql, is_comma_trans=False):
                 # 添加字段前空格
                 for tmp_pos in range(len(tmp)):
                     # 20190321 wq 修复逗号前置和字段中含注释所导致的错误（逗号被注释掉）
-                    if re.search(r'[^,]+--w\d+q,$', tmp[tmp_pos]) is not None:
+                    if re.search(r'[^,]+--z\d+s,$', tmp[tmp_pos]) is not None:
                         tmp[tmp_pos] = re.sub(',$', '', re.sub(r'(?<=[^,])\s*--', ', --', tmp[tmp_pos]))
                     if tmp_pos == 0:
                         if is_comma_trans is True:
-                            tmp[tmp_pos] = re.sub(r',(?=\s*(--w\d+q)?$)', '', tmp[tmp_pos])
+                            tmp[tmp_pos] = re.sub(r',(?=\s*(--z\d+s)?$)', '', tmp[tmp_pos])
                         tmp[tmp_pos] = re.sub(r'^\s*(\w*)\s*', first_value.rjust(6) + 2 * " ", tmp[tmp_pos])
                     else:
                         if is_comma_trans is True and tmp[tmp_pos] != '':
-                            tmp[tmp_pos] = ',' + re.sub(r',(?=\s*(--w\d+q)?$)', '', tmp[tmp_pos])
+                            tmp[tmp_pos] = ',' + re.sub(r',(?=\s*(--z\d+s)?$)', '', tmp[tmp_pos])
                         tmp[tmp_pos] = 8 * " " + tmp[tmp_pos]
                     # case when 特别处理
                     # 20190322 wq 1.when/else换行 2.else后跟低于10个字符 end不换行
@@ -119,15 +120,21 @@ def sql_split(sql, is_comma_trans=False):
                         tmp_case = [i[0] for i in re.findall(r'((.*?(,?case\s)?when|else\s.{10,}(?=\send)|'
                                                              r' else\s.{0,10} end|end).*?(?=\s(when|else|end)\s|$))',
                                                              tmp[tmp_pos])]
-                        case_pos = 0
-                        for tmp_case_pos in range(len(tmp_case)):
-                            if tmp_case_pos == 0:
-                                case_pos = tmp_case[tmp_case_pos].find('when')
-                            elif re.match('^end', tmp_case[tmp_case_pos]):
-                                tmp_case[tmp_case_pos] = (case_pos + 1) * ' ' + tmp_case[tmp_case_pos].strip()
-                            else:
-                                tmp_case[tmp_case_pos] = case_pos * ' ' + tmp_case[tmp_case_pos].strip()
-                        tmp[tmp_pos] = tmp_case
+                        # 20190924 wq 如果只有一个when的话就不对else换行
+                        if len(tmp_case) < 2:
+                            pass
+                        elif re.search(' else ', tmp_case[1]):
+                            tmp[tmp_pos] = ''.join(tmp_case)
+                        else:
+                            case_pos = 0
+                            for tmp_case_pos in range(len(tmp_case)):
+                                if tmp_case_pos == 0:
+                                    case_pos = tmp_case[tmp_case_pos].find('when')
+                                elif re.match('^end', tmp_case[tmp_case_pos]):
+                                    tmp_case[tmp_case_pos] = (case_pos + 1) * ' ' + tmp_case[tmp_case_pos].strip()
+                                else:
+                                    tmp_case[tmp_case_pos] = case_pos * ' ' + tmp_case[tmp_case_pos].strip()
+                            tmp[tmp_pos] = tmp_case
                     else:
                         pass
                 exec_sql[exec_sql_pos] = tmp
@@ -163,42 +170,39 @@ def sql_format(sql, is_comma_trans=False):
     result_sql = ''
     # 20190316 wq 修复注释问题，先将注释内容取出,映射到一个随机数，等处理完后最后映射回来
     notes = [i[0] for i in re.findall(r'(\s*(--.*?(?=\r?\n)|/\*(.|\n)*?\*/))', sql)]
-    notes_encode = ['w' + str(random.randint(1000000, 10000000)) + 'q' for i in notes]
+    notes_encode = ['z' + str(random.randint(1000000, 10000000)) + 's' for i in notes]
     for note_pos in range(len(notes)):
         sql = re.sub(notes[note_pos] + r'(?=\W)', '--' + notes_encode[note_pos], sql, 1)
+    # 20190924 wq 引用符中的内容 处理【引用涉及字段引用，因此与注释分开去处理】
+    quotes = [i[0] for i in re.findall(r'((\'|`|\")(.|\n)*?(\'|`|\"))', sql)]
+    quotes_encode = ['y' + str(random.randint(1000000, 10000000)) + 'y' for i in quotes]
+    for quote_pos in range(len(quotes)):
+        sql = re.sub(quotes[quote_pos], quotes_encode[quote_pos], sql, 1)
     # 统一空白符
     sql = ' ' + re.sub(r'\s+', ' ', sql).strip() + ' '
-    # 格式化运算符，关键字转化小写（跳过单引号内的字符串）
-    tmp_sql = [i[0] for i in re.findall('((\'.*?\')|([^\']*))', sql)]
-    for tmp_sql_pos in range(len(tmp_sql)):
-        if re.search('^\'', tmp_sql[tmp_sql_pos]):
-            pass
+    tmp_sql = sql.lower()
+    for pattern_atom in [r'\[', r'\(', r'\]', ',', r'\)', r'\+', '-', r'\*', '/', '=', '<', '>', '!']:
+        pattern = '[ ]*{0}[ ]*'.format(pattern_atom)
+        if pattern_atom in (r'\[', r'\('):
+            repl_str = re.sub(r'\\', '', pattern_atom)
+        elif pattern_atom in [r'\]', ',', r'\)']:
+            repl_str = re.sub(r'\\', '', pattern_atom) + ' '
+        elif pattern_atom in [r'\+', r'\*', '/', '=', '<', '>', '!']:
+            repl_str = ' ' + re.sub(r'\\', '', pattern_atom) + ' '
+        elif pattern_atom == '-':
+            pattern = '[ ]*(?<!-)-(?!-)[ ]*'
+            repl_str = ' - '
         else:
-            tmp_sql[tmp_sql_pos] = tmp_sql[tmp_sql_pos].lower()
-            for pattern_atom in [r'\[', r'\(', r'\]', ',', r'\)', r'\+', '-', r'\*', '/', '=', '<', '>', '!']:
-                pattern = '[ ]*{0}[ ]*'.format(pattern_atom)
-                if pattern_atom in (r'\[', r'\('):
-                    repl_str = re.sub(r'\\', '', pattern_atom)
-                elif pattern_atom in [r'\]', ',', r'\)']:
-                    repl_str = re.sub(r'\\', '', pattern_atom) + ' '
-                elif pattern_atom in [r'\+', r'\*', '/', '=', '<', '>', '!']:
-                    repl_str = ' ' + re.sub(r'\\', '', pattern_atom) + ' '
-                elif pattern_atom == '-':
-                    pattern = '[ ]*(?<!-)-(?!-)[ ]*'
-                    repl_str = ' - '
-                else:
-                    pass
-                tmp_sql[tmp_sql_pos] = re.sub(pattern, repl_str, tmp_sql[tmp_sql_pos])
-            # 20190321 wq 优化符号的处理，例如"100 * -1"
-            tmp_sql[tmp_sql_pos] = re.sub(r'(?<=\[|\]|,|\(|\))\s*(?=\[|\]|,|\(|\))', '', tmp_sql[tmp_sql_pos])
-            tmp_sql[tmp_sql_pos] = re.sub(r'(?<=!|=|<|>)\s*(?=!|=|<|>)', '', tmp_sql[tmp_sql_pos])
-            # 字段中符号开头
-            tmp_sql[tmp_sql_pos] = re.sub(r'(?<=,\s(\+|-))\s*(?!-)', '', tmp_sql[tmp_sql_pos])
-            tmp_sql[tmp_sql_pos] = re.sub(r'(?<=(\+|-|\*|/|=|<|>)\s(\+|-))\s*', '', tmp_sql[tmp_sql_pos])
-            # 20190326 wq 修复子查询的问题
-            tmp_sql[tmp_sql_pos] = tmp_sql[tmp_sql_pos].replace('(--', '( --')\
-                .replace('(select ', '( select ')
-    tmp_sql = ''.join(tmp_sql)
+            pass
+        tmp_sql = re.sub(pattern, repl_str, tmp_sql)
+    # 20190321 wq 优化符号的处理，例如"100 * -1"
+    tmp_sql = re.sub(r'(?<=\[|\]|,|\(|\))\s*(?=\[|\]|,|\(|\))', '', tmp_sql)
+    tmp_sql = re.sub(r'(?<=!|=|<|>)\s*(?=!|=|<|>)', '', tmp_sql)
+    # 字段中符号开头
+    tmp_sql = re.sub(r'(?<=,\s(\+|-))\s*(?!-)', '', tmp_sql)
+    tmp_sql = re.sub(r'(?<=(\+|-|\*|/|=|<|>)\s(\+|-))\s*', '', tmp_sql)
+    # 20190326 wq 修复子查询的问题
+    tmp_sql = tmp_sql.replace('(--', '( --').replace('(select ', '( select ')
     # 20190312 wq 关键字后直接接左括号
     tmp_sql = re.sub(r'((?<=\sselect)|(?<=\sfrom)|(?<=\sjoin)|(?<=\son)|'
                      r'(?<=\swhere)|(?<=\sby)|(?<=\shaving)|(?<=\sas)|(?<=\sin))\(', ' (', tmp_sql)
@@ -237,6 +241,9 @@ def sql_format(sql, is_comma_trans=False):
             notes[note_pos] = notes[note_pos] + "\r\n" + space
     for note_pos in range(len(notes_encode)):
         result_sql = re.sub(r'\s*--\s*' + notes_encode[note_pos], notes[note_pos], result_sql)
+    for quotes_pos in range(len(quotes_encode)):
+        result_sql = re.sub(quotes_encode[quotes_pos], quotes[quotes_pos], result_sql)
+
     # 20190404 wq 去掉重复表名
     custom_table_list = list(set(custom_table_list))
     table_list = list(set(table_list))
@@ -250,18 +257,19 @@ if __name__ == '__main__':
     exec_sql = [
         """
     with user_data as (select 123  union all select array(1,2,3)),
-    user_date_2 as (select row_count() over (order by 123) from wq_date_2)
+    user_date_2 as (select row_count() over (order by 123, 'dsf
+    sdf') from wq_date_2)
     insert overwrite table pdw.dim_tag_information
     select 1,2,array(
     1,--dsf
     2,--dsfs
     3 
-    ), 
+    ) as `ddd-ddd`, 
     -- 校验关键字位置的错误
     online_date, stady_on_info
       from user_data a 
       left join (select 1,2,3,             --sdfsdfs
-      4, case when 1=1 then 1 else 12312412433213213 end as dffffffff,5) b 
+      4, case when 1=1 then 1 else 123 end as dffffffff,5) b 
         on 1=1
         and 2!= 2
     left join user_data c 
