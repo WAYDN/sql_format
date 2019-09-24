@@ -169,15 +169,15 @@ def sql_format(sql, is_comma_trans=False):
     level = 0
     result_sql = ''
     # 20190316 wq 修复注释问题，先将注释内容取出,映射到一个随机数，等处理完后最后映射回来
-    notes = [i[0] for i in re.findall(r'(\s*(--.*?(?=\r?\n)|/\*(.|\n)*?\*/))', sql)]
+    notes = list(set([i[0] for i in re.findall(r'(\s*(--.*?(?=\r?\n)|/\*(.|\n)*?\*/))', sql)]))
     notes_encode = ['z' + str(random.randint(1000000, 10000000)) + 's' for i in notes]
     for note_pos in range(len(notes)):
         sql = re.sub(notes[note_pos] + r'(?=\W)', '--' + notes_encode[note_pos], sql, 1)
     # 20190924 wq 引用符中的内容 处理【引用涉及字段引用，因此与注释分开去处理】
-    quotes = [i[0] for i in re.findall(r'((\'|`|\")(.|\n)*?(\'|`|\"))', sql)]
+    quotes = list(set([i[0] for i in re.findall(r'((\'|`|\")(.|\n)*?(\'|`|\"))', sql)]))
     quotes_encode = ['y' + str(random.randint(1000000, 10000000)) + 'y' for i in quotes]
     for quote_pos in range(len(quotes)):
-        sql = re.sub(quotes[quote_pos], quotes_encode[quote_pos], sql, 1)
+        sql = sql.replace(quotes[quote_pos], quotes_encode[quote_pos])
     # 统一空白符
     sql = ' ' + re.sub(r'\s+', ' ', sql).strip() + ' '
     tmp_sql = sql.lower()
@@ -256,42 +256,7 @@ def sql_format(sql, is_comma_trans=False):
 if __name__ == '__main__':
     exec_sql = [
         """
-select  p1.hp_stat_date as `日期`,
-        p2.is_trade_day as `是否交易日`,
-        p1.advisor_name as `圈子`,
-        p1.user_type as `用户类型`,
-        p1.total_uv as `总访问用户数`,
-        p1.total_pv as `总访问次数`,
-        p1.ssbb_uv as `实时播报页访问用户数`,
-        case when p1.total_uv > 0 then 100 * p1.ssbb_uv / p1.total_uv
-              end as `实时播报页访问占比`,
-        case when p1.ssbb_uv > 0 then p1.ssbb_pv / p1.ssbb_uv
-              end as `实时播报页人均访问次数`,
-        p1.jinguchi_uv as `金股池页访问用户数`,
-        case when p1.total_uv > 0 then 100 * p1.jinguchi_uv / p1.total_uv
-              end as `金股池页访问占比`,
-        case when p1.jinguchi_uv > 0 then p1.jinguchi_pv / p1.jinguchi_uv
-              end as `金股池页人均访问次数`,
-        p1.cpjh_uv as `操盘计划页访问用户数`,
-        case when p1.total_uv > 0 then 100 * p1.cpjh_uv / p1.total_uv
-              end as `操盘计划页访问占比`,
-        case when p1.cpjh_uv > 0 then p1.cpjh_pv / p1.cpjh_uv
-              end as `操盘计划页人均访问次数`,
-        p1.neican_uv as `内参页访问用户数`,
-        case when p1.total_uv > 0 then 100 * p1.neican_uv / p1.total_uv
-              end as `内参页访问占比`,
-        case when p1.neican_uv > 0 then p1.neican_pv / p1.neican_uv
-              end as `内参页人均访问次数`,
-        p1.zstg_uv as `专属投顾页访问用户数`,
-        case when p1.total_uv > 0 then 100 * p1.zstg_uv / p1.total_uv
-              end as `专属投顾页访问占比`,
-        case when p1.zstg_uv > 0 then p1.zstg_pv / p1.zstg_uv
-              end as `专属投顾页人均访问次数`,
-        p1.quanzi_uv as `圈子介绍页访问用户数`,
-        case when p1.total_uv > 0 then 100 * p1.quanzi_uv / p1.total_uv
-              end as `圈子介绍页访问占比`,
-        case when p1.quanzi_uv > 0 then p1.quanzi_pv / p1.quanzi_uv
-              end as `圈子介绍页人均访问次数`
+select regexp_extract(objects, '^(ssbb|jinguchi|cpjh|neican|zstg|quanzi)_([0-9]+)$', 2) as advisor_id
         """
     ]
     for exec_sql_vaule in exec_sql:
