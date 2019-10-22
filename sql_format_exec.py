@@ -18,6 +18,7 @@
 20190423 wq 1.函数内注释修复：强制插入换行 2.兼容hive关键字：lateral view（2.1.2）
 20190827 wq 1.函数内注释修复导致的格式错误 2.修复union的换行 3.修复子查询中以函数结尾的分割问题（2.2）
 20190924 wq 1.case when...end：如果只有一个when的话就不对else换行 2.引用内容保持原样(2.2.1)
+20191022 wq 1.增加返回表名的功能
 """
 
 import re
@@ -169,6 +170,7 @@ def sql_format(sql, is_comma_trans=False):
     level = 0
     result_sql = ''
     # 20190316 wq 修复注释问题，先将注释内容取出,映射到一个随机数，等处理完后最后映射回来
+    sql = sql + '\n'
     notes = list(set([i[0] for i in re.findall(r'(\s*(--.*?(?=\r?\n)|/\*(.|\n)*?\*/))', sql)]))
     notes_encode = ['z' + str(random.randint(1000000, 10000000)) + 's' for i in notes]
     for note_pos in range(len(notes)):
@@ -256,7 +258,22 @@ def sql_format(sql, is_comma_trans=False):
 if __name__ == '__main__':
     exec_sql = [
         """
-select regexp_extract(objects, '^(ssbb|jinguchi|cpjh|neican|zstg|quanzi)_([0-9]+)$', 2) as advisor_id
+		select  date(start_day) as sd,
+				product_id,
+				count(case when end_day >= ${pt_day} then 1 end) as in_order_cnt,
+				count(case when end_day < ${pt_day} then 1 end) as off_order_cnt,
+				count(1) as order_cnt,
+				max(unix_timestamp(end_day)) as last_end_time,
+				split(max(concat(end_day, '#', user_id)), '#')[1] as last_user_id
+		  from  pdw.fact_sscf_order
+		where  product_id is not null 
+		   and  start_day <= end_day
+		   and  ((order_type in ('2', '8') and status = 2) 
+				or (order_type not in ('2', '8') and status in (2, 4, 5)))
+		   and  (pay_type not in (6, 9)
+				or (pay_type = 8 and datediff(end_day, start_day) >= 3))
+		 group  by date(start_day),
+				product_id
         """
     ]
     for exec_sql_vaule in exec_sql:

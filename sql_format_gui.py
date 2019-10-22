@@ -17,16 +17,21 @@ sf_frame.Center()
 menu_bar = wx.MenuBar()
 set_menu = wx.Menu()
 font_menu = wx.MenuItem(set_menu, 1, "字体", kind=wx.ITEM_NORMAL)
+comma_menu = wx.MenuItem(set_menu, 4, "逗号前置", kind=wx.ITEM_CHECK)
+table_menu = wx.MenuItem(set_menu, 5, "输出表名", kind=wx.ITEM_CHECK)
+set_menu.Append(font_menu)
+set_menu.AppendSeparator()
+set_menu.Append(comma_menu)
+set_menu.Append(table_menu)
+
+show_menu = wx.Menu()
 show_space_menu = wx.MenuItem(set_menu, 2, "显示空格", kind=wx.ITEM_CHECK)
 wrap_menu = wx.MenuItem(set_menu, 3, "自动换行", kind=wx.ITEM_CHECK)
-set_menu.Append(font_menu)
-set_menu.Append(show_space_menu)
-set_menu.Append(wrap_menu)
-trans_menu = wx.Menu()
-comma_menu = wx.MenuItem(set_menu, 4, "逗号前置", kind=wx.ITEM_CHECK)
-trans_menu.Append(comma_menu)
+show_menu.Append(show_space_menu)
+show_menu.Append(wrap_menu)
+
 menu_bar.Append(set_menu, title="设置")
-menu_bar.Append(trans_menu, title="变换")
+menu_bar.Append(show_menu, title="显示")
 sf_frame.SetMenuBar(menu_bar)
 
 sf_panel = wx.Panel(sf_frame)
@@ -37,10 +42,11 @@ sql_text.SetMarginType(1, ws.STC_MARGIN_NUMBER)
 sql_text.SetMarginWidth(1, 25)
 sql_text.StyleSetFontAttr(0, 10, "Consolas", False, False, False)
 sql_text.SetUseTabs(False)
-sql_text.SetValue("""
+sql_text.SetValue(u"""
 select  a.user_id,
         a.name
   from  (
+        -- 测试数据
         select  user_id,
                 trim(name) as name,--中文名字
                 row_number() over (partiti  on by user_id  order by apply_time desc) as rn,
@@ -73,7 +79,10 @@ def button_leave(event):
 def exec_format(event):
     source_sql = sql_text.GetValue()
     try:
-        result_sql = sql_format_exec.sql_format(source_sql, comma_menu.IsChecked())[0]
+        result = sql_format_exec.sql_format(source_sql, comma_menu.IsChecked())
+        result_sql = result[0]
+        if table_menu.IsChecked() == 1:
+            result_sql = result_sql + '\r\n\r\n-- ' + ','.join(result[1])
         sql_text.SetValue(result_sql)
     except Exception as a:
         sql_text.SetValue("调用出现问题:{0}".format(a))
