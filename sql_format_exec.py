@@ -244,7 +244,7 @@ def sql_format(sql, is_comma_trans=False):
     for note_pos in range(len(notes_encode)):
         result_sql = re.sub(r'\s*--\s*' + notes_encode[note_pos], notes[note_pos], result_sql)
     for quotes_pos in range(len(quotes_encode)):
-        result_sql = re.sub(quotes_encode[quotes_pos], quotes[quotes_pos], result_sql)
+        result_sql = result_sql.replace(quotes_encode[quotes_pos], quotes[quotes_pos])
 
     # 20190404 wq 去掉重复表名
     custom_table_list = list(set(custom_table_list))
