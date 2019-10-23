@@ -18,7 +18,7 @@
 20190423 wq 1.函数内注释修复：强制插入换行 2.兼容hive关键字：lateral view（2.1.2）
 20190827 wq 1.函数内注释修复导致的格式错误 2.修复union的换行 3.修复子查询中以函数结尾的分割问题（2.2）
 20190924 wq 1.case when...end：如果只有一个when的话就不对else换行 2.引用内容保持原样(2.2.1)
-20191022 wq 1.增加返回表名的功能
+20191023 wq 1.增加返回表名的功能 2.优化 多结构下逻辑连接符的格式 (2.3)
 """
 
 import re
@@ -142,9 +142,16 @@ def sql_split(sql, is_comma_trans=False):
             elif first_value in ('on', 'where', 'having'):
                 tmp = [i[0] for i in re.findall(r'(\s*(where|on|having|and|or)\s.*?(?=\s(and|or|on|where|having)\s|$))',
                                                 exec_sql_value)]
+                bracket_num = 0
                 for tmp_pos in range(len(tmp)):
                     first_value_2 = re.match(r'^\s*(\w*)\s*', tmp[tmp_pos]).group(1)
-                    tmp[tmp_pos] = re.sub(r'^\s*(\w*)\s*', first_value_2.rjust(6) + 2 * " ", tmp[tmp_pos])
+                    if bracket_num >= 0:
+                        bool_num = 1
+                    else:
+                        bool_num = 2
+                    tmp[tmp_pos] = re.sub(r'^\s*(\w*)\s*', first_value_2.rjust(6) + bool_num * " ", tmp[tmp_pos])
+                    tmp[tmp_pos] = bracket_num * '    ' + tmp[tmp_pos]
+                    bracket_num = bracket_num + tmp[tmp_pos].count('(') - tmp[tmp_pos].count(')')
                 exec_sql[exec_sql_pos] = tmp
             # 20190423 wq 兼容hive关键字：lateral view
             elif first_value == 'lateral':
@@ -187,8 +194,10 @@ def sql_format(sql, is_comma_trans=False):
         pattern = '[ ]*{0}[ ]*'.format(pattern_atom)
         if pattern_atom in (r'\[', r'\('):
             repl_str = re.sub(r'\\', '', pattern_atom)
+            pattern = r'(?=(\w|\(|\[|\)|\]) )' + pattern
         elif pattern_atom in [r'\]', ',', r'\)']:
             repl_str = re.sub(r'\\', '', pattern_atom) + ' '
+            pattern = r'(?=(\w|\(|\[|\)|\]) )' + pattern
         elif pattern_atom in [r'\+', r'\*', '/', '=', '<', '>', '!']:
             repl_str = ' ' + re.sub(r'\\', '', pattern_atom) + ' '
         elif pattern_atom == '-':
