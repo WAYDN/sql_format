@@ -19,6 +19,7 @@
 20190827 wq 1.函数内注释修复导致的格式错误 2.修复union的换行 3.修复子查询中以函数结尾的分割问题（2.2）
 20190924 wq 1.case when...end：如果只有一个when的话就不对else换行 2.引用内容保持原样(2.2.1)
 20191023 wq 1.增加返回表名的功能 2.优化多结构逻辑判断下逻辑连接符的格式 (2.3)
+20191025 wq 增加with...as中第二个as之后的前置空格 (2.3.1)
 """
 
 import re
@@ -158,8 +159,11 @@ def sql_split(sql, is_comma_trans=False):
                 exec_sql[exec_sql_pos] = re.sub(r'^\s*(\w*)\s*', 'lateral ', exec_sql[exec_sql_pos])
             else:
                 if first_value != ')':
-                    exec_sql[exec_sql_pos] = re.sub(r'^\s*(--|\w*)\s*', first_value.rjust(6) + 2 * " ",
-                                                    re.sub(r'\s*\(', ' (', exec_sql[exec_sql_pos]))
+                    if re.search(r'^\w+ as \($', exec_sql[exec_sql_pos]):
+                        exec_sql[exec_sql_pos] = 8 * " " + exec_sql[exec_sql_pos]
+                    else:
+                        exec_sql[exec_sql_pos] = re.sub(r'^\s*(--|\w*)\s*', first_value.rjust(6) + 2 * " ",
+                                                        re.sub(r'\s*\(', ' (', exec_sql[exec_sql_pos]))
                 else:
                     # exec_sql[exec_sql_pos] = 8 * " " + exec_sql[exec_sql_pos]
                     pass
@@ -195,10 +199,10 @@ def sql_format(sql, is_comma_trans=False):
         if pattern_atom in (r'\[', r'\('):
             repl_str = re.sub(r'\\', '', pattern_atom)
             pattern = r'(?=(\w|\(|\[|\)|\]) )' + pattern
-        elif pattern_atom in [r'\]', ',', r'\)']:
+        elif pattern_atom in [r'\]', r'\)']:
             repl_str = re.sub(r'\\', '', pattern_atom) + ' '
             pattern = r'(?=(\w|\(|\[|\)|\]) )' + pattern
-        elif pattern_atom in [r'\+', r'\*', '/', '=', '<', '>', '!']:
+        elif pattern_atom in [r'\+', r'\*', '/', '=', '<', '>', '!', r',']:
             repl_str = ' ' + re.sub(r'\\', '', pattern_atom) + ' '
         elif pattern_atom == '-':
             pattern = '[ ]*(?<!-)-(?!-)[ ]*'
@@ -267,6 +271,7 @@ def sql_format(sql, is_comma_trans=False):
 if __name__ == '__main__':
     exec_sql = [
         """
+        with a as (select 123+123,321),tmp_test_b as (select 321)
 		select  date(start_day) as sd,
 				product_id,
 				count(case when end_day >= ${pt_day} then 1 end) as in_order_cnt,
