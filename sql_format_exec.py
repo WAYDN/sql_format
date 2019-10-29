@@ -18,8 +18,9 @@
 20190423 wq 1.函数内注释修复：强制插入换行 2.兼容hive关键字：lateral view（2.1.2）
 20190827 wq 1.函数内注释修复导致的格式错误 2.修复union的换行 3.修复子查询中以函数结尾的分割问题（2.2）
 20190924 wq 1.case when...end：如果只有一个when的话就不对else换行 2.引用内容保持原样(2.2.1)
-20191023 wq 1.增加返回表名的功能 2.优化多结构逻辑判断下逻辑连接符的格式 (2.3)
-20191025 wq 增加with...as中第二个as之后的前置空格 (2.3.1)
+20191023 wq 1.增加返回表名的功能 2.优化多结构逻辑判断下逻辑连接符的格式(2.3)
+20191025 wq 增加with...as中第二个as之后的前置空格(2.3.1)
+20191029 wq 1.修复where/on/and 后置单空格 2.上次修复导致的逗号后多空一格等问题（2.3.2）
 """
 
 import re
@@ -62,10 +63,10 @@ def sql_split(sql, is_comma_trans=False):
     # 20190319 wq 消除窗口函数中order等字段中含关键字的影响,将select到from或select到union或select整合在一起
     split_sql_list_pos = 0
     while split_sql_list_pos < len(split_sql_list)-1 and len(split_sql_list) > 1:
-        if re.search(r'^select(?![^\(]+\))', split_sql_list[split_sql_list_pos]) \
-                and not re.search('^(from|select|union) ', split_sql_list[split_sql_list_pos+1])\
-                and not split_sql_list[split_sql_list_pos].count('(') < split_sql_list[split_sql_list_pos].count(')'):
-            split_sql_list[split_sql_list_pos] += ' ' + split_sql_list[split_sql_list_pos+1]
+        if not re.search('^(from|select|union) ', split_sql_list[split_sql_list_pos+1])\
+                and split_sql_list[split_sql_list_pos].count('(') > split_sql_list[split_sql_list_pos].count(')'):
+            split_sql_list[split_sql_list_pos] = split_sql_list[split_sql_list_pos].strip() + ' ' + \
+                                                 split_sql_list[split_sql_list_pos+1]
             split_sql_list.pop(split_sql_list_pos+1)
         else:
             split_sql_list_pos += 1
@@ -126,7 +127,7 @@ def sql_split(sql, is_comma_trans=False):
                         if len(tmp_case) < 2:
                             pass
                         elif re.search(r'^\s*(else|end) ', tmp_case[1]):
-                            tmp[tmp_pos] = ' '.join(tmp_case)
+                            tmp[tmp_pos] = tmp_case[0] + ' ' + tmp_case[1].strip()
                         else:
                             case_pos = 0
                             for tmp_case_pos in range(len(tmp_case)):
@@ -146,7 +147,7 @@ def sql_split(sql, is_comma_trans=False):
                 bracket_num = 0
                 for tmp_pos in range(len(tmp)):
                     first_value_2 = re.match(r'^\s*(\w*)\s*', tmp[tmp_pos]).group(1)
-                    if bracket_num >= 0:
+                    if bracket_num > 0:
                         bool_num = 1
                     else:
                         bool_num = 2
@@ -198,11 +199,11 @@ def sql_format(sql, is_comma_trans=False):
         pattern = '[ ]*{0}[ ]*'.format(pattern_atom)
         if pattern_atom in (r'\[', r'\('):
             repl_str = re.sub(r'\\', '', pattern_atom)
-            pattern = r'(?=(\w|\(|\[|\)|\]) )' + pattern
-        elif pattern_atom in [r'\]', r'\)']:
+            pattern = r'(?<=(\w|\(|\[|\)|\]))' + pattern
+        elif pattern_atom in [r'\]', r'\)', r',']:
             repl_str = re.sub(r'\\', '', pattern_atom) + ' '
-            pattern = r'(?=(\w|\(|\[|\)|\]) )' + pattern
-        elif pattern_atom in [r'\+', r'\*', '/', '=', '<', '>', '!', r',']:
+            pattern = r'(?<=(\w|\(|\[|\)|\]))' + pattern
+        elif pattern_atom in [r'\+', r'\*', '/', '=', '<', '>', '!']:
             repl_str = ' ' + re.sub(r'\\', '', pattern_atom) + ' '
         elif pattern_atom == '-':
             pattern = '[ ]*(?<!-)-(?!-)[ ]*'
@@ -219,8 +220,8 @@ def sql_format(sql, is_comma_trans=False):
     # 20190326 wq 修复子查询的问题
     tmp_sql = tmp_sql.replace('(--', '( --').replace('(select ', '( select ')
     # 20190312 wq 关键字后直接接左括号
-    tmp_sql = re.sub(r'((?<=\sselect)|(?<=\sfrom)|(?<=\sjoin)|(?<=\son)|'
-                     r'(?<=\swhere)|(?<=\sby)|(?<=\shaving)|(?<=\sas)|(?<=\sin))\(', ' (', tmp_sql)
+    tmp_sql = re.sub(r'((?<=\Wselect)|(?<=\Wfrom)|(?<=\Wjoin)|(?<=\Won)|(?<=\Wover)|(?<=\Wand)|(?<=\Wor)|'
+                     r'(?<=\Wwhere)|(?<=\Wby)|(?<=\Whaving)|(?<=\Was)|(?<=\Win))\(', ' (', tmp_sql)
     # 按括号添加前缀空格
     split_sql = sql_split(tmp_sql, is_comma_trans)
     table_list = []
@@ -274,11 +275,10 @@ if __name__ == '__main__':
         with a as (select 123+123,321),tmp_test_b as (select 321)
 		select  date(start_day) as sd,
 				product_id,
-				count(case when end_day >= ${pt_day} then 1 end) as in_order_cnt,
-				count(case when end_day < ${pt_day} then 1 end) as off_order_cnt,
 				count(1) as order_cnt,
-				max(unix_timestamp(end_day)) as last_end_time,
-				split(max(concat(end_day, '#', user_id)), '#')[1] as last_user_id
+				max(unix_timestamp(end_day)) as last_end_time
+				,split(max(concat(end_day, '#', user_id)), '#')[1] as last_user_id
+				,row_number() over (partition by user_id  order by apply_time desc) as rn
 		  from  pdw.fact_sscf_order
 		where  product_id is not null 
 		   and  start_day <= end_day
@@ -288,6 +288,10 @@ if __name__ == '__main__':
 				or (pay_type = 8 and datediff(end_day, start_day) >= 3))
 		 group  by date(start_day),
 				product_id
+		 union  all 
+		select  1,2 from (select 1)
+		 union  all 
+		select  1,2
         """
     ]
     for exec_sql_vaule in exec_sql:

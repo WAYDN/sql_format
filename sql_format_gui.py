@@ -49,11 +49,12 @@ select  a.user_id,
         -- 测试数据
         select  user_id,
                 trim(name) as name,--中文名字
-                row_number() over (partiti  on by user_id  order by apply_time desc) as rn,
+                row_number() over (partition by user_id  order by apply_time desc) as rn,
                 case when 1=1 then endddd else appendas end,
                 test
           from  ods.ods_chain_store_user_auth
          where  regexp_like(trim(name), '^[\u4E00-\u9FA5]+$')
+           and  (1 = 1 or 2<> 2)
         ) a
  where  rn = 1
  """)
