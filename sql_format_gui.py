@@ -1,9 +1,5 @@
 # coding=utf-8
 
-"""
-20190319 wq 新增逗号前置功能
-"""
-
 import wx
 import wx.stc as ws
 import sql_format_exec
