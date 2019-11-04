@@ -114,6 +114,9 @@ def event_menu(event):
 
 
 set_menu.Bind(wx.EVT_MENU, event_menu)
+show_menu.Bind(wx.EVT_MENU, event_menu)
+
+
 v_box = wx.BoxSizer(wx.VERTICAL)
 v_box.Add(sql_text, proportion=1, flag=wx.EXPAND)
 v_box.Add(button, proportion=0, flag=wx.ALIGN_CENTER | wx.ALL, border=5)
