@@ -1,7 +1,7 @@
 # coding=utf-8
 
 import wx
-import wx.stc as ws
+import wx.stc as stc
 import sql_format_exec
 
 sf_app = wx.App()
@@ -33,8 +33,8 @@ sf_frame.SetMenuBar(menu_bar)
 sf_panel = wx.Panel(sf_frame)
 sf_panel.SetBackgroundColour('#F5F5F5')
 
-sql_text = ws.StyledTextCtrl(sf_panel, style=wx.TE_MULTILINE | wx.HSCROLL | wx.TE_RICH)
-sql_text.SetMarginType(1, ws.STC_MARGIN_NUMBER)
+sql_text = stc.StyledTextCtrl(sf_panel, style=wx.TE_MULTILINE | wx.HSCROLL | wx.TE_RICH)
+sql_text.SetMarginType(1, stc.STC_MARGIN_NUMBER)
 sql_text.SetMarginWidth(1, 25)
 sql_text.StyleSetFontAttr(0, 10, "Consolas", False, False, False)
 sql_text.SetUseTabs(False)
@@ -54,6 +54,26 @@ select  a.user_id,
         ) a
  where  rn = 1
  """)
+
+
+def highlight(event):
+    brace_pos = -1
+    current_pos = sql_text.GetCurrentPos()
+    if current_pos >= 0:
+        current_pos -= 1
+        # BraceMatch 获取当前括号位置所对应的另一个括号位置
+        brace_pos = sql_text.BraceMatch(current_pos)
+        if chr(sql_text.GetCharAt(current_pos)) in list('{}[]()'):
+            sql_text.BraceHighlight(current_pos, brace_pos)
+        else:
+            # 重置标色位置
+            # sql_text.BraceBadLight(current_pos)
+            sql_text.BraceHighlight(-1, -1)
+    sql_text.StyleSetSpec(stc.STC_STYLE_BRACELIGHT, "fore:#000000,back:#87CEFF,face:{0}".
+                          format(sql_text.StyleGetFaceName(0)))
+
+
+sql_text.Bind(stc.EVT_STC_UPDATEUI, highlight)
 
 # 按钮控件
 button = wx.Button(sf_panel, label="格式化", style=wx.Center)
