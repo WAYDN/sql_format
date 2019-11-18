@@ -3,6 +3,7 @@
 import wx
 import wx.stc as stc
 import sql_format_exec
+import re
 
 sf_app = wx.App()
 sf_frame = wx.Frame(None, title='SQL格式助手', size=(640, 480), style=wx.DEFAULT_FRAME_STYLE)
@@ -56,6 +57,7 @@ select  a.user_id,
  """)
 
 
+# 文本高亮[1.括号高亮]
 def highlight(event):
     brace_pos = -1
     current_pos = sql_text.GetCurrentPos()
@@ -73,7 +75,31 @@ def highlight(event):
                           format(sql_text.StyleGetFaceName(0)))
 
 
+# 关键词提示
+def keyword_tip(event):
+    tmp_kw = ['select', 'from', 'left', 'right', 'full', 'inner', 'join', 'on', 'where', 'group', 'by', 'order',
+              'limit', 'having', 'union', 'all', 'insert', 'create', 'lateral', 'view', 'with', 'as']
+    kw = []
+    sql_kw = re.findall(r'[a-z_]{2,}', sql_text.GetValue())
+    if sql_text.CallTipActive():
+        sql_text.CallTipCancel()
+    if event.ControlDown():
+        current_pos = sql_text.GetCurrentPos()
+        current_str = str(sql_text.GetValue()[sql_text.WordStartPosition(current_pos, True):current_pos])
+        tmp_kw = tmp_kw + sql_kw
+        tmp_kw = list(set(tmp_kw))
+        for i in tmp_kw:
+            if re.search(current_str, i):
+                kw.append(i)
+        kw.sort()
+        # sql_text.AutoCompSetIgnoreCase(True)  # so this needs to match
+        sql_text.AutoCompShow(0, " ".join(kw))
+    else:
+        event.Skip()
+
+
 sql_text.Bind(stc.EVT_STC_UPDATEUI, highlight)
+sql_text.Bind(wx.EVT_KEY_DOWN, keyword_tip)
 
 # 按钮控件
 button = wx.Button(sf_panel, label="格式化", style=wx.Center)
