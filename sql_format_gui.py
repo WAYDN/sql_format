@@ -80,12 +80,13 @@ def keyword_tip(event):
     tmp_kw = ['select', 'from', 'left', 'right', 'full', 'inner', 'join', 'on', 'where', 'group', 'by', 'order',
               'limit', 'having', 'union', 'all', 'insert', 'create', 'lateral', 'view', 'with', 'as']
     kw = []
-    sql_kw = re.findall(r'[a-z_]{2,}', sql_text.GetValue())
+    sql_kw = re.findall(r'\w{2,}', sql_text.GetValue())
     if sql_text.CallTipActive():
         sql_text.CallTipCancel()
-    if event.ControlDown():
+    if event.ControlDown() and event.AltDown():
         current_pos = sql_text.GetCurrentPos()
-        current_str = str(sql_text.GetValue()[sql_text.WordStartPosition(current_pos, True):current_pos])
+        sql_content = sql_text.GetValue().encode('utf-8')
+        current_str = sql_content[sql_text.WordStartPosition(current_pos, True):current_pos].decode('utf-8')
         tmp_kw = tmp_kw + sql_kw
         tmp_kw = list(set(tmp_kw))
         for i in tmp_kw:
@@ -93,6 +94,7 @@ def keyword_tip(event):
                 kw.append(i)
         kw.sort()
         # sql_text.AutoCompSetIgnoreCase(True)  # so this needs to match
+        sql_text.AutoCompSetDropRestOfWord(True)
         sql_text.AutoCompShow(0, " ".join(kw))
     else:
         event.Skip()
