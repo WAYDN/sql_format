@@ -24,8 +24,12 @@ set_menu.Append(table_menu)
 show_menu = wx.Menu()
 show_space_menu = wx.MenuItem(set_menu, 2, "显示空格", kind=wx.ITEM_CHECK)
 wrap_menu = wx.MenuItem(set_menu, 3, "自动换行", kind=wx.ITEM_CHECK)
+kw_tip_menu = wx.MenuItem(set_menu, 6, "关键词提示", kind=wx.ITEM_CHECK)
 show_menu.Append(show_space_menu)
 show_menu.Append(wrap_menu)
+show_menu.AppendSeparator()
+show_menu.Append(kw_tip_menu)
+kw_tip_menu.Check(True)
 
 menu_bar.Append(set_menu, title="设置")
 menu_bar.Append(show_menu, title="显示")
@@ -77,31 +81,46 @@ def highlight(event):
 
 # 关键词提示
 def keyword_tip(event):
-    tmp_kw = ['select', 'from', 'left', 'right', 'full', 'inner', 'join', 'on', 'where', 'group', 'by', 'order',
-              'limit', 'having', 'union', 'all', 'insert', 'create', 'lateral', 'view', 'with', 'as']
-    kw = []
-    sql_kw = re.findall(r'\w{2,}', sql_text.GetValue())
-    if sql_text.CallTipActive():
-        sql_text.CallTipCancel()
-    if event.ControlDown() and event.AltDown():
+    global last_pos
+    if kw_tip_menu.IsChecked():
         current_pos = sql_text.GetCurrentPos()
         sql_content = sql_text.GetValue().encode('utf-8')
-        current_str = sql_content[sql_text.WordStartPosition(current_pos, True):current_pos].decode('utf-8')
-        tmp_kw = tmp_kw + sql_kw
+        word_start_pos = sql_text.WordStartPosition(current_pos, True)
+        current_str = sql_content[word_start_pos:current_pos].decode('utf-8')
+        tmp_kw = ['select', 'from', 'left', 'right', 'full', 'inner', 'join', 'on', 'where', 'group', 'by', 'order',
+                  'limit', 'having', 'union', 'all', 'insert', 'create', 'lateral', 'view', 'with', 'as']
+        kw = []
+        sql_kw = re.findall(r'\w{2,}', sql_text.GetValue())
+        tmp_kw += sql_kw
         tmp_kw = list(set(tmp_kw))
-        for i in tmp_kw:
-            if re.search(current_str, i):
-                kw.append(i)
-        kw.sort()
-        # sql_text.AutoCompSetIgnoreCase(True)  # so this needs to match
-        sql_text.AutoCompSetDropRestOfWord(True)
-        sql_text.AutoCompShow(0, " ".join(kw))
-    else:
-        event.Skip()
+        key_code = event.GetKeyCode()
+        if key_code in (13, 314, 315, 316, 317):
+            # 自动填补时清除历史字符并重新定位光标
+            if key_code == 13 and word_start_pos < last_pos and current_str != '':
+                sql_text.SetValue(sql_content[:word_start_pos] + sql_content[last_pos:])
+                sql_text.GotoPos(current_pos - last_pos + word_start_pos)
+                # print(current_pos, last_pos, word_start_pos)
+            event.Skip()
+        elif current_str != '':
+            for i in tmp_kw:
+                if re.search(current_str, i) and current_str != i:
+                    kw.append(i)
+            kw.sort()
+            sql_text.AutoCompShow(0, " ".join(kw))
+            # 默认优先选择
+            sql_text.AutoCompSelect(current_str)
+            sql_text.AutoCompSetAutoHide(True)
+            # 完成匹配后 是否删除后续字符
+            sql_text.AutoCompSetDropRestOfWord(True)
+        else:
+            event.Skip()
+            # 当组合键时关闭提示
+            sql_text.AutoCompCancel()
+        last_pos = current_pos
 
 
 sql_text.Bind(stc.EVT_STC_UPDATEUI, highlight)
-sql_text.Bind(wx.EVT_KEY_DOWN, keyword_tip)
+sql_text.Bind(wx.EVT_KEY_UP, keyword_tip)
 
 # 按钮控件
 button = wx.Button(sf_panel, label="格式化", style=wx.Center)
