@@ -128,7 +128,7 @@ def sql_split(sql, is_comma_trans=False):
                         bool_num = 1
                     else:
                         bool_num = 2
-                    tmp[tmp_pos] = re.sub(r'^\s*(\w*)\s*', first_value_2.rjust(6) + bool_num * " ", tmp[tmp_pos])
+                    tmp[tmp_pos] = re.sub(r'^\s*(\w*)\s*', first_value_2.rjust(8-bool_num) + bool_num * " ", tmp[tmp_pos])
                     tmp[tmp_pos] = bracket_num * '    ' + tmp[tmp_pos]
                     bracket_num = bracket_num + tmp[tmp_pos].count('(') - tmp[tmp_pos].count(')')
                 exec_sql[exec_sql_pos] = tmp
@@ -163,7 +163,7 @@ def sql_format(sql, is_comma_trans=False):
     notes = list(set([i[0] for i in re.findall(r'(\s*(--.*?(?=\r?\n)|/\*(.|\n)*?\*/))', sql)]))
     notes_encode = ['z' + str(random.randint(1000000, 10000000)) + 's' for i in notes]
     for note_pos in range(len(notes)):
-        sql = re.sub(notes[note_pos] + r'(?=\W)', '--' + notes_encode[note_pos], sql, 1)
+        sql = sql.replace(notes[note_pos], '--' + notes_encode[note_pos])
     # 20190924 wq 引用符中的内容 处理【引用涉及字段引用，因此与注释分开去处理】
     quotes = list(set([i[0] for i in re.findall(r'((\'|`|\")(.|\n)*?(\'|`|\"))', sql)]))
     quotes_encode = ['y' + str(random.randint(1000000, 10000000)) + 'y' for i in quotes]
@@ -223,7 +223,7 @@ def sql_format(sql, is_comma_trans=False):
             pass
     # 20190423 wq 函数内注释修复：强制插入换行
     for note_pos in range(len(notes_encode)):
-        if re.search(notes_encode[note_pos] + "\r\n", result_sql) is not None:
+        if re.search(notes_encode[note_pos] + "\r?\n", result_sql) is not None:
             pass
         else:
             # 20190827 wq 修复字段内的注释
