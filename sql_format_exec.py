@@ -85,7 +85,7 @@ def sql_split(sql, is_comma_trans=False):
                 for tmp_pos in range(len(tmp)):
                     # 20190321 wq 修复逗号前置和字段中含注释所导致的错误（逗号被注释掉）
                     if re.search(r'[^,]+--z\d+s,$', tmp[tmp_pos]) is not None:
-                        tmp[tmp_pos] = re.sub(',$', '', re.sub(r'(?<=[^,])\s*--', ', --', tmp[tmp_pos]))
+                        tmp[tmp_pos] = re.sub(',$', '', re.sub(r'(?<=[^,])\s*--', ', --', tmp[tmp_pos], 1))
                     if tmp_pos == 0:
                         if is_comma_trans is True:
                             tmp[tmp_pos] = re.sub(r',(?=\s*(--z\d+s)?$)', '', tmp[tmp_pos])
@@ -249,26 +249,15 @@ def sql_format(sql, is_comma_trans=False):
 if __name__ == '__main__':
     exec_sql = [
         """
-        with a as (select 123+123,321),tmp_test_b as (select 321)
-		select  date(start_day) as sd,
-				product_id,
-				count(1) as order_cnt,
-				max(unix_timestamp(end_day)) as last_end_time
-				,split(max(concat(end_day, '#', user_id)), '#')[1] as last_user_id
-				,row_number() over (partition by user_id  order by apply_time desc) as rn
-		  from  pdw.fact_sscf_order
-		where  product_id is not null 
-		   and  start_day <= end_day
-		   and  ((order_type in ('2', '8') and status = 2) 
-				or (order_type not in ('2', '8') and status in (2, 4, 5)))
-		   and  (pay_type not in (6, 9)
-				or (pay_type = 8 and datediff(end_day, start_day) >= 3))
-		 group  by date(start_day),
-				product_id
-		 union  all 
-		select  1,2 from (select 1)
-		 union  all 
-		select  1,2
+        select  abc
+                ,sss
+                --,dddd
+                --,ddds
+                ,sefsef --dfsdfe 
+                --fsef
+                ,ddd(serfesfag ---sfef
+                        )
+          from  eeee
         """
     ]
     for exec_sql_vaule in exec_sql:
