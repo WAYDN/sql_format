@@ -100,10 +100,10 @@ def sql_split(sql, is_comma_trans=False):
                         tmp_case = [i[0] for i in re.findall(r'((.*?(,?case\s)?when|else\s.{10,}(?=\send)|'
                                                              r' else\s.{0,10} end|end).*?(?=\s(when|else|end)\s|$))',
                                                              tmp[tmp_pos])]
-                        # 20190924 wq 如果只有一个when的话就不对else换行
+                        # 20190924 wq 如果只有一个when且没有else的话就不对end换行
                         if len(tmp_case) < 2:
                             pass
-                        elif re.search(r'^\s*(else|end) ', tmp_case[1]):
+                        elif re.search(r'^\s*end ', tmp_case[1]):
                             tmp[tmp_pos] = tmp_case[0] + ' ' + tmp_case[1].strip()
                         else:
                             case_pos = 0
@@ -249,15 +249,7 @@ def sql_format(sql, is_comma_trans=False):
 if __name__ == '__main__':
     exec_sql = [
         """
-        select  abc
-                ,sss
-                --,dddd
-                --,ddds
-                ,sefsef --dfsdfe 
-                --fsef
-                ,ddd(serfesfag ---sfef
-                        )
-          from  eeee
+select case when coalesce(from_object, '') not in ('icon', '') then from_object else from_resourceid end as from_content, count(1) from pdw.fact_stock_em_web_log where hp_stat_date >= '2019-11-01' and hp_stat_date <= '2019-11-28' and objects rlike '^(ssbb|neican)_\\d+$' and user_id <> 0 group by 1
         """
     ]
     for exec_sql_vaule in exec_sql:
