@@ -16,10 +16,13 @@ set_menu = wx.Menu()
 font_menu = wx.MenuItem(set_menu, 1, "字体", kind=wx.ITEM_NORMAL)
 comma_menu = wx.MenuItem(set_menu, 4, "逗号前置", kind=wx.ITEM_CHECK)
 table_menu = wx.MenuItem(set_menu, 5, "输出表名", kind=wx.ITEM_CHECK)
+# 后续考虑改成输入框，用户自定义关键词后续的空格个数
+space_menu = wx.MenuItem(set_menu, 7, "单空格", kind=wx.ITEM_CHECK)
 set_menu.Append(font_menu)
 set_menu.AppendSeparator()
 set_menu.Append(comma_menu)
 set_menu.Append(table_menu)
+set_menu.Append(space_menu)
 
 show_menu = wx.Menu()
 show_space_menu = wx.MenuItem(set_menu, 2, "显示空格", kind=wx.ITEM_CHECK)
@@ -156,7 +159,11 @@ def button_leave(event):
 def exec_format(event):
     source_sql = sql_text.GetValue()
     try:
-        result = sql_format_exec.sql_format(source_sql, comma_menu.IsChecked())
+        if space_menu.IsChecked() == 1:
+            space_num = 1
+        else:
+            space_num = 2
+        result = sql_format_exec.sql_format(source_sql, comma_menu.IsChecked(), space_num)
         result_sql = result[0]
         if table_menu.IsChecked() == 1:
             result_sql = result_sql + '\r\n\r\n-- ' + ','.join(result[1])

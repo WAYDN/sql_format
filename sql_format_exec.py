@@ -19,11 +19,12 @@ def list_remake(l):
         return [l]
 
 
-def sql_split(sql, is_comma_trans=False):
+def sql_split(sql, is_comma_trans=False, space_num=2):
     """
     用于分割sql，返回list
     :param sql: string/待处理sql
     :param is_comma_trans: int/逗号是否前置
+    :param space_num: int/关键字后空格个数
     :return: list
     """
     # 分割sql, 结尾加\s 防止将非关键字给分割了 例如pdw_fact_person_insure中的on
@@ -89,11 +90,11 @@ def sql_split(sql, is_comma_trans=False):
                     if tmp_pos == 0:
                         if is_comma_trans is True:
                             tmp[tmp_pos] = re.sub(r',(?=\s*(--z\d+s)?$)', '', tmp[tmp_pos])
-                        tmp[tmp_pos] = re.sub(r'^\s*(\w*)\s*', first_value.rjust(6) + 2 * " ", tmp[tmp_pos])
+                        tmp[tmp_pos] = re.sub(r'^\s*(\w*)\s*', first_value.rjust(6) + space_num * " ", tmp[tmp_pos])
                     else:
                         if is_comma_trans is True and tmp[tmp_pos] != '':
                             tmp[tmp_pos] = ',' + re.sub(r',(?=\s*(--z\d+s)?$)', '', tmp[tmp_pos])
-                        tmp[tmp_pos] = 8 * " " + tmp[tmp_pos]
+                        tmp[tmp_pos] = (6 + space_num) * " " + tmp[tmp_pos]
                     # case when 特别处理
                     # 20190322 wq 1.when/else换行 2.else后跟低于10个字符 end不换行
                     if re.search(',?case', tmp[tmp_pos]):
@@ -124,11 +125,12 @@ def sql_split(sql, is_comma_trans=False):
                 bracket_num = 0
                 for tmp_pos in range(len(tmp)):
                     first_value_2 = re.match(r'^\s*(\w*)\s*', tmp[tmp_pos]).group(1)
-                    if bracket_num > 0:
+                    if bracket_num > 0 or space_num == 1:
                         bool_num = 1
                     else:
                         bool_num = 2
-                    tmp[tmp_pos] = re.sub(r'^\s*(\w*)\s*', first_value_2.rjust(8-bool_num) + bool_num * " ", tmp[tmp_pos])
+                    tmp[tmp_pos] = re.sub(r'^\s*(\w*)\s*', first_value_2.rjust(6 + space_num - bool_num)
+                                          + bool_num * " ", tmp[tmp_pos])
                     tmp[tmp_pos] = bracket_num * '    ' + tmp[tmp_pos]
                     bracket_num = bracket_num + tmp[tmp_pos].count('(') - tmp[tmp_pos].count(')')
                 exec_sql[exec_sql_pos] = tmp
@@ -138,22 +140,23 @@ def sql_split(sql, is_comma_trans=False):
             else:
                 if first_value != ')':
                     if re.search(r'^\w+ as \($', exec_sql[exec_sql_pos]):
-                        exec_sql[exec_sql_pos] = 8 * " " + exec_sql[exec_sql_pos]
+                        exec_sql[exec_sql_pos] = (6 + space_num) * " " + exec_sql[exec_sql_pos]
                     else:
-                        exec_sql[exec_sql_pos] = re.sub(r'^\s*(--|\w*)\s*', first_value.rjust(6) + 2 * " ",
+                        exec_sql[exec_sql_pos] = re.sub(r'^\s*(--|\w*)\s*', first_value.rjust(6) + space_num * " ",
                                                         re.sub(r'\s*\(', ' (', exec_sql[exec_sql_pos]))
                 else:
-                    # exec_sql[exec_sql_pos] = 8 * " " + exec_sql[exec_sql_pos]
+                    # exec_sql[exec_sql_pos] = (6 + space_num) * " " + exec_sql[exec_sql_pos]
                     pass
         split_sql_list[split_sql_pos] = exec_sql
     return list_remake(split_sql_list)
 
 
-def sql_format(sql, is_comma_trans=False):
+def sql_format(sql, is_comma_trans=False, space_num=2):
     """
     将list整合成str，并处理空白字符
     :param sql:string/待处理sql
     :param is_comma_trans: bool/逗号是否前置
+    :param space_num: int/关键字后空格个数
     :return: list/处理后的sql及当中所涉及到的表
     """
     level = 0
@@ -200,7 +203,7 @@ def sql_format(sql, is_comma_trans=False):
     tmp_sql = re.sub(r'((?<=\Wselect)|(?<=\Wfrom)|(?<=\Wjoin)|(?<=\Won)|(?<=\Wover)|(?<=\Wand)|(?<=\Wor)|'
                      r'(?<=\Wwhere)|(?<=\Wby)|(?<=\Whaving)|(?<=\Was)|(?<=\Win))\(', ' (', tmp_sql)
     # 按括号添加前缀空格
-    split_sql = sql_split(tmp_sql, is_comma_trans)
+    split_sql = sql_split(tmp_sql, is_comma_trans, space_num)
     table_list = []
     custom_table_list = []
     # 20190328 wq 获取from后的表，再与with/as的自定义表名对比，剔除
@@ -249,12 +252,13 @@ def sql_format(sql, is_comma_trans=False):
 if __name__ == '__main__':
     exec_sql = [
         """
-select case when coalesce(from_object, '') not in ('icon', '') then from_object else from_resourceid end as from_content, count(1) from pdw.fact_stock_em_web_log where hp_stat_date >= '2019-11-01' and hp_stat_date <= '2019-11-28' and objects rlike '^(ssbb|neican)_\\d+$' and user_id <> 0 group by 1
+select case when coalesce(from_object, '') not in ('icon', '') then from_object else from_resourceid end as from_content, count(1) from pdw.fact_stock_em_web_log 
+where hp_stat_date >= '2019-11-01' and hp_stat_date <= '2019-11-28' and objects rlike '^(ssbb|neican)_\\d+$' and user_id <> 0 group by 1
         """
     ]
     for exec_sql_vaule in exec_sql:
         # print(exec_sql_vaule)
         # print("------------------------无情分割线-----------------------")
-        format_sql = sql_format(exec_sql_vaule, False)
+        format_sql = sql_format(exec_sql_vaule, False, 1)
         print(format_sql[0])
         print(format_sql[1])
