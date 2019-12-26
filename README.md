@@ -29,6 +29,7 @@ python3.6
 - .gitignore
 - sql_format_gui.py <!--GUI界面-->
 - sql_format_exec.py<!--实际执行文件-->
+- set_info.ini<!--设置信息-->
 - sql_format.ico
 - version_info.txt
 - \_\_init\_\_.py
@@ -46,6 +47,7 @@ python3.6
 <br>20191210 wq 修复连续注释导致的逗号错误写入 (2.4.5)
 <br>20191210 wq 回滚2.2.1中case when的改动 (2.4.5.1)
 <br>20191225 wq 新增关键词后保留单个空格的功能 (2.4.6)
+<br>20191226 wq 新增菜单栏配置文件，记忆用户上次设置信息 (2.4.7)
 - 2.3
 <br>20191023 wq 1.增加返回表名的功能 2.优化多结构逻辑判断下逻辑连接符的格式(2.3)
 <br>20191025 wq 增加with...as中第二个as之后的前置空格(2.3.1)

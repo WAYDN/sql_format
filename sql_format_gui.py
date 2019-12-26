@@ -4,6 +4,8 @@ import wx
 import wx.stc as stc
 import sql_format_exec
 import re
+import os
+import configparser
 
 sf_app = wx.App()
 sf_frame = wx.Frame(None, title='SQL格式助手', size=(640, 480), style=wx.DEFAULT_FRAME_STYLE)
@@ -32,7 +34,18 @@ show_menu.Append(show_space_menu)
 show_menu.Append(wrap_menu)
 show_menu.AppendSeparator()
 show_menu.Append(kw_tip_menu)
-kw_tip_menu.Check(True)
+
+# 读取预设变量
+set_info = configparser.ConfigParser()
+if os.path.exists('set_info.ini'):
+    set_info.read('set_info.ini')
+    set_data = dict(set_info.items('set_info'))
+    comma_menu.Check(int(set_data['comma']))
+    table_menu.Check(int(set_data['table']))
+    space_menu.Check(int(set_data['space']))
+    show_space_menu.Check(int(set_data['show_space']))
+    wrap_menu.Check(int(set_data['wrap']))
+    kw_tip_menu.Check(int(set_data['kw_tip']))
 
 menu_bar.Append(set_menu, title="设置")
 menu_bar.Append(show_menu, title="显示")
@@ -46,6 +59,10 @@ sql_text.SetMarginType(1, stc.STC_MARGIN_NUMBER)
 sql_text.SetMarginWidth(1, 25)
 sql_text.StyleSetFontAttr(0, 10, "Consolas", False, False, False)
 sql_text.SetUseTabs(False)
+sql_text.SetViewWhiteSpace(show_space_menu.IsChecked())
+sql_text.SetWhitespaceForeground(True, 'Red')
+sql_text.SetWhitespaceSize(2)
+sql_text.SetWrapMode(wrap_menu.IsChecked())
 # 设置配色
 sql_text.SetCaretLineVisible(True)
 sql_text.SetCaretLineBackground("#F0F8FF")
@@ -187,16 +204,19 @@ def event_menu(event):
         dlg.Destroy()
     elif event_id == 2:
         sql_text.SetViewWhiteSpace(show_space_menu.IsChecked())
-        sql_text.SetWhitespaceForeground(True, 'Red')
-        sql_text.SetWhitespaceSize(2)
     elif event_id == 3:
-        if wrap_menu.IsChecked():
-            sql_text.SetWrapMode(1)
-        else:
-            sql_text.SetWrapMode(0)
+        sql_text.SetWrapMode(wrap_menu.IsChecked())
+    set_info.set('set_info', 'comma', str(int(comma_menu.IsChecked())))
+    set_info.set('set_info', 'table', str(int(table_menu.IsChecked())))
+    set_info.set('set_info', 'space', str(int(space_menu.IsChecked())))
+    set_info.set('set_info', 'show_space', str(int(show_space_menu.IsChecked())))
+    set_info.set('set_info', 'wrap', str(int(wrap_menu.IsChecked())))
+    set_info.set('set_info', 'kw_tip', str(int(kw_tip_menu.IsChecked())))
+    set_info.write(open('set_info.ini', 'r+', encoding="utf-8"))
 
 
 set_menu.Bind(wx.EVT_MENU, event_menu)
+# event_menu(None)
 show_menu.Bind(wx.EVT_MENU, event_menu)
 
 
@@ -207,3 +227,4 @@ sf_panel.SetSizer(v_box)
 
 sf_frame.Show()
 sf_app.MainLoop()
+
