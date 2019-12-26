@@ -46,6 +46,8 @@ if os.path.exists('set_info.ini'):
     show_space_menu.Check(int(set_data['show_space']))
     wrap_menu.Check(int(set_data['wrap']))
     kw_tip_menu.Check(int(set_data['kw_tip']))
+else:
+    set_info.add_section('set_info')
 
 menu_bar.Append(set_menu, title="设置")
 menu_bar.Append(show_menu, title="显示")
@@ -212,7 +214,7 @@ def event_menu(event):
     set_info.set('set_info', 'show_space', str(int(show_space_menu.IsChecked())))
     set_info.set('set_info', 'wrap', str(int(wrap_menu.IsChecked())))
     set_info.set('set_info', 'kw_tip', str(int(kw_tip_menu.IsChecked())))
-    set_info.write(open('set_info.ini', 'r+', encoding="utf-8"))
+    set_info.write(open('set_info.ini', 'w+', encoding="utf-8"))
 
 
 set_menu.Bind(wx.EVT_MENU, event_menu)
