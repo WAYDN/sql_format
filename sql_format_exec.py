@@ -96,15 +96,20 @@ def sql_split(sql, is_comma_trans=False, space_num=2):
                             tmp[tmp_pos] = ',' + re.sub(r',(?=\s*(--z\d+s)?$)', '', tmp[tmp_pos])
                         tmp[tmp_pos] = (6 + space_num) * " " + tmp[tmp_pos]
                     # case when 特别处理
-                    # 20190322 wq 1.when/else换行 2.else后跟低于10个字符 end不换行
+                    """
+                    20200108 when/else/end 不换行规则
+                    1.else与end之间只相隔10个字符，end不换行
+                    2.只有when与end，end不换行
+                    3.end后面没有空格即直接接逗号，end不换行
+                    4.只有一个when，且else与end之间只相隔10个字符，else和end不换行
+                    """
                     if re.search(',?case', tmp[tmp_pos]):
                         tmp_case = [i[0] for i in re.findall(r'((.*?(,?case\s)?when|else\s.{10,}(?=\send)|'
                                                              r' else\s.{0,10} end|end).*?(?=\s(when|else|end)\s|$))',
                                                              tmp[tmp_pos])]
-                        # 20190924 wq 如果只有一个when且没有else的话就不对end换行
                         if len(tmp_case) < 2:
                             pass
-                        elif re.search(r'^\s*end ', tmp_case[1]):
+                        elif len(tmp_case) == 2 and re.search(r'^\s*else.*end\W', tmp_case[1]):
                             tmp[tmp_pos] = tmp_case[0] + ' ' + tmp_case[1].strip()
                         else:
                             case_pos = 0
