@@ -66,7 +66,8 @@ def sql_split(sql, is_comma_trans=False, space_num=2):
             first_value = re.match(r'\s*(--|\w+|\))\s?', exec_sql_value).group(1)
             if first_value in ('select', 'group', 'order'):
                 # 分割字段，根据','分割出所有字段
-                tmp_sql = [i[0].strip() for i in re.findall(r'(.*?(,(\s*--\s*[^\s]*)?|$))', exec_sql_value)]
+                tmp_sql = [i[0].strip() for i in re.findall(r'(.*?(,(\s*--\s*[^\s]*)?|$))', exec_sql_value)
+                           if i[0].strip() != '']
                 tmp = []
                 # 20190319 wq 合并函数中的括号和中括号
                 for tmp_sql_pos in range(len(tmp_sql)):
@@ -208,27 +209,34 @@ def sql_format(sql, is_comma_trans=False, space_num=2):
     tmp_sql = re.sub(r'((?<=\Wselect)|(?<=\Wfrom)|(?<=\Wjoin)|(?<=\Won)|(?<=\Wover)|(?<=\Wand)|(?<=\Wor)|'
                      r'(?<=\Wwhere)|(?<=\Wby)|(?<=\Whaving)|(?<=\Was)|(?<=\Win))\(', ' (', tmp_sql)
     # 按括号添加前缀空格
-    split_sql = sql_split(tmp_sql, is_comma_trans, space_num)
     table_list = []
     custom_table_list = []
-    # 20190328 wq 获取from后的表，再与with/as的自定义表名对比，剔除
-    # 20190402 wq 1.获取表名：增加join的判断
-    for split_sql_value in split_sql:
-        if re.match(r'^\s*(from|((left|right|full|inner|cross)\s+(outer\s+)?)?join)\s+[^\(]+$', split_sql_value):
-            table_list.append(re.search(r'(from|join)\s+(.+?)(?=--|\s|$)', split_sql_value).group(2))
-        elif re.match(r'^\s*\swith.*?\(|[^,]*as\s*\(', split_sql_value):
-            custom_table_list.append(re.search(r'((?<=with)\s+[^\s]+|[^\s]+(?=\s+as))', split_sql_value).group(1).strip())
-        else:
-            pass
-        if re.match(r'^\s*$', split_sql_value):
-            continue
-        result_sql = result_sql + level * 8 * " " + split_sql_value + "\r\n"
-        if re.search(r'\((\s*--\s*[^\s]*)?\s*$', split_sql_value):
-            level += 1
-        elif re.search(r'^\s*\)\s*.*?,?\s*$', split_sql_value):
-            level -= 1
-        else:
-            pass
+    for tmp_sql_value in tmp_sql.split(';'):
+        if tmp_sql_value != '':
+            split_sql = sql_split(tmp_sql_value + '\n', is_comma_trans, space_num)
+            # 20190328 wq 获取from后的表，再与with/as的自定义表名对比，剔除
+            # 20190402 wq 1.获取表名：增加join的判断
+            for split_sql_value in split_sql:
+                if re.match(r'^\s*(from|((left|right|full|inner|cross)\s+(outer\s+)?)?join)\s+[^\(]+$',
+                            split_sql_value):
+                    table_list.append(re.search(r'(from|join)\s+(.+?)(?=--|\s|$)', split_sql_value).group(2))
+                elif re.match(r'^\s*\swith.*?\(|[^,]*as\s*\(', split_sql_value):
+                    custom_table_list.append(re.search(r'((?<=with)\s+[^\s]+|[^\s]+(?=\s+as))',
+                                                       split_sql_value).group(1).strip())
+                else:
+                    pass
+                if re.match(r'^\s*$', split_sql_value):
+                    continue
+                if split_sql_value == split_sql[-1] and not re.search(r'^\s*--', split_sql_value):
+                    result_sql = result_sql + level * 8 * " " + split_sql_value + ";\r\n"
+                else:
+                    result_sql = result_sql + level * 8 * " " + split_sql_value + "\r\n"
+                if re.search(r'\((\s*--\s*[^\s]*)?\s*$', split_sql_value):
+                    level += 1
+                elif re.search(r'^\s*\)\s*.*?,?\s*$', split_sql_value):
+                    level -= 1
+                else:
+                    pass
     # 20190423 wq 函数内注释修复：强制插入换行
     for note_pos in range(len(notes_encode)):
         if re.search(notes_encode[note_pos] + "\r?\n", result_sql) is not None:

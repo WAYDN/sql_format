@@ -77,12 +77,12 @@ select  a.user_id,
                 trim(name) as name,--中文名字
                 row_number() over (partition by user_id  order by apply_time desc) as rn,
                 case when 1=1 then endddd else appendas end,
-                test
-          from  ods.ods_chain_store_user_auth
+                ';' as test
+          from  test.wq_sql_format_ds
          where  regexp_like(trim(name), '^[\u4E00-\u9FA5]+$')
            and  (1 = 1 or 2<> 2)
         ) a
- where  rn = 1
+ where  rn = 1; select 123;select 12333
  """)
 
 
@@ -184,7 +184,7 @@ def exec_format(event):
             space_num = 2
         result = sql_format_exec.sql_format(source_sql, comma_menu.IsChecked(), space_num)
         result_sql = result[0]
-        if table_menu.IsChecked() == 1:
+        if table_menu.IsChecked() == 1 and result[1] != []:
             result_sql = result_sql + '\r\n\r\n-- ' + ','.join(result[1])
         sql_text.SetValue(result_sql)
     except Exception as a:
