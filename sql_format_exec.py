@@ -173,7 +173,7 @@ def sql_format(sql, is_comma_trans=False, space_num=2):
     for note_pos in range(len(notes)):
         sql = sql.replace(notes[note_pos], '--' + notes_encode[note_pos])
     # 20190924 wq 引用符中的内容 处理【引用涉及字段引用，因此与注释分开去处理】
-    quotes = list(set([i[0] for i in re.findall(r'((\'|`|\")(.|\n)*?(\'|`|\"))', sql)]))
+    quotes = list(set([i[0] for i in re.findall(r'((\'(.|\n)*?\')|(`(.|\n)*?`)|(\"(.|\n)*?\"))', sql)]))
     quotes_encode = ['y' + str(random.randint(1000000, 10000000)) + 'y' for i in quotes]
     for quote_pos in range(len(quotes)):
         sql = sql.replace(quotes[quote_pos], quotes_encode[quote_pos])
@@ -257,7 +257,7 @@ def sql_format(sql, is_comma_trans=False, space_num=2):
 if __name__ == '__main__':
     exec_sql = [
         """
-select case when coalesce(from_object, '') not in ('icon', '') then from_object else from_resourceid end as from_content, count(1) from pdw.fact_stock_em_web_log 
+select regexp_extract(map_col, 'from_sign_id":"([^2]+)"', 1), case when coalesce(from_object, '') not in ('icon', '') then from_object else from_resourceid end as from_content, count(1) from pdw.fact_stock_em_web_log 
 where hp_stat_date >= '2019-11-01' and hp_stat_date <= '2019-11-28' and objects rlike '^(ssbb|neican)_\\d+$' and user_id <> 0 group by 1
         """
     ]

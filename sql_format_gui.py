@@ -65,12 +65,29 @@ sql_text.SetViewWhiteSpace(show_space_menu.IsChecked())
 sql_text.SetWhitespaceForeground(True, 'Red')
 sql_text.SetWhitespaceSize(2)
 sql_text.SetWrapMode(wrap_menu.IsChecked())
-# 设置配色
+sql_text_face = sql_text.StyleGetFaceName(0)
+# 设置默认配色
+sql_text.SetLexer(stc.STC_LEX_SQL)
+# # 清空历史样式
+# sql_text.StyleClearAll()
+# 注释
+sql_text.StyleSetSpec(stc.STC_SQL_COMMENTLINE, "fore:#228B22")
+# 数字
+sql_text.StyleSetSpec(stc.STC_SQL_NUMBER, "fore:#FF8C00")
+# 双引号
+sql_text.StyleSetSpec(stc.STC_SQL_STRING, "fore:#CFCFCF")
+# 单引号
+sql_text.StyleSetSpec(stc.STC_SQL_CHARACTER, "fore:#9B30FF")
+# 运算符+标点符号
+sql_text.StyleSetSpec(stc.STC_SQL_OPERATOR, "fore:#1C86EE")
+# 标识符[所有其他字符]
+sql_text.StyleSetSpec(stc.STC_SQL_IDENTIFIER, "fore:#000000,face:Consolas")
+
 sql_text.SetCaretLineVisible(True)
 sql_text.SetCaretLineBackground("#F0F8FF")
 sql_text.SetValue(u"""
-select  a.user_id,
-        a.name
+select  a.user_id as "wq",
+        a.name as `qw`
   from  (
         -- 测试数据
         select  user_id,
@@ -102,7 +119,7 @@ def highlight(event):
             # sql_text.BraceBadLight(current_pos)
             sql_text.BraceHighlight(-1, -1)
     sql_text.StyleSetSpec(stc.STC_STYLE_BRACELIGHT, "fore:#000000,back:#87CEFF,face:{0}".
-                          format(sql_text.StyleGetFaceName(0)))
+                          format(sql_text_face))
 
     # 选择高亮
     select_context = sql_text.GetSelectedText()
@@ -202,7 +219,7 @@ def event_menu(event):
         dlg = wx.FontDialog()
         if dlg.ShowModal() == wx.ID_OK:
             data = dlg.GetFontData()
-            sql_text.StyleSetFont(0, data.GetChosenFont())
+            sql_text.StyleSetFont(stc.STC_SQL_IDENTIFIER, data.GetChosenFont())
         dlg.Destroy()
     elif event_id == 2:
         sql_text.SetViewWhiteSpace(show_space_menu.IsChecked())
