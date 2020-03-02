@@ -128,6 +128,13 @@ def sql_split(sql, is_comma_trans=False, space_num=2):
             elif first_value in ('on', 'where', 'having'):
                 tmp = [i[0] for i in re.findall(r'(\s*(where|on|having|and|or)\s.*?(?=\s(and|or|on|where|having)\s|$))',
                                                 exec_sql_value)]
+                # between值校验
+                i = 0
+                while i < len(tmp):
+                    if re.search(r'\sbetween\s', tmp[i]):
+                        tmp[i] = tmp[i] + tmp[i + 1]
+                        del tmp[i + 1]
+                    i += 1
                 bracket_num = 0
                 for tmp_pos in range(len(tmp)):
                     first_value_2 = re.match(r'^\s*(\w*)\s*', tmp[tmp_pos]).group(1)
@@ -266,7 +273,7 @@ if __name__ == '__main__':
     exec_sql = [
         """
 select regexp_extract(map_col, 'from_sign_id":"([^2]+)"', 1), case when coalesce(from_object, '') not in ('icon', '') then from_object else from_resourceid end as from_content, count(1) from pdw.fact_stock_em_web_log 
-where hp_stat_date >= '2019-11-01' and hp_stat_date <= '2019-11-28' and objects rlike '^(ssbb|neican)_\\d+$' and user_id <> 0 group by 1
+where hp_stat_date between '2019-11-01' and '2019-11-28' and objects rlike '^(ssbb|neican)_\\d+$' and user_id <> 0 group by 1
         """
     ]
     for exec_sql_vaule in exec_sql:
