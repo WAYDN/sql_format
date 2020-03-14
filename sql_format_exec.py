@@ -219,7 +219,8 @@ def sql_format(sql, is_comma_trans=False, space_num=2):
     table_list = []
     custom_table_list = []
     for tmp_sql_value in tmp_sql.split(';'):
-        if tmp_sql_value != '':
+        tmp_result_sql = ''
+        if not re.search(r'^\s*$', tmp_sql_value):
             split_sql = sql_split(tmp_sql_value + '\n', is_comma_trans, space_num)
             # 20190328 wq 获取from后的表，再与with/as的自定义表名对比，剔除
             # 20190402 wq 1.获取表名：增加join的判断
@@ -234,16 +235,19 @@ def sql_format(sql, is_comma_trans=False, space_num=2):
                     pass
                 if re.match(r'^\s*$', split_sql_value):
                     continue
-                if split_sql_value == split_sql[-1] and not re.search(r'^\s*--', split_sql_value):
-                    result_sql = result_sql + level * 8 * " " + split_sql_value + ";\r\n"
-                else:
-                    result_sql = result_sql + level * 8 * " " + split_sql_value + "\r\n"
+                tmp_result_sql = tmp_result_sql + level * 8 * " " + split_sql_value + "\r\n"
                 if re.search(r'\((\s*--\s*[^\s]*)?\s*$', split_sql_value):
                     level += 1
                 elif re.search(r'^\s*\)\s*.*?,?\s*$', split_sql_value):
                     level -= 1
                 else:
                     pass
+            print(tmp_result_sql)
+            print('####################')
+            if not re.search(r'^\s*--', tmp_sql_value):
+                result_sql = result_sql + re.sub(r'\r\n$', ';\r\n', tmp_result_sql)
+            else:
+                result_sql = result_sql + tmp_result_sql
     # 20190423 wq 函数内注释修复：强制插入换行
     for note_pos in range(len(notes_encode)):
         if re.search(notes_encode[note_pos] + "\r?\n", result_sql) is not None:
@@ -272,6 +276,7 @@ def sql_format(sql, is_comma_trans=False, space_num=2):
 if __name__ == '__main__':
     exec_sql = [
         """
+        with asss as (select 123),dds as (select 123),da as (select 321)
 select regexp_extract(map_col, 'from_sign_id":"([^2]+)"', 1), case when coalesce(from_object, '') not in ('icon', '') then from_object else from_resourceid end as from_content, count(1) from pdw.fact_stock_em_web_log 
 where hp_stat_date between '2019-11-01' and '2019-11-28' and objects rlike '^(ssbb|neican)_\\d+$' and user_id <> 0 group by 1
         """
