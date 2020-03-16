@@ -242,12 +242,10 @@ def sql_format(sql, is_comma_trans=False, space_num=2):
                     level -= 1
                 else:
                     pass
-            print(tmp_result_sql)
-            print('####################')
-            if not re.search(r'^\s*--', tmp_sql_value):
-                result_sql = result_sql + re.sub(r'\r\n$', ';\r\n', tmp_result_sql)
-            else:
+            if re.search(r'^\s*--', tmp_sql_value) and tmp_sql_value == tmp_sql.split(';')[-1]:
                 result_sql = result_sql + tmp_result_sql
+            else:
+                result_sql = result_sql + re.sub(r'\r\n$', ';\r\n', tmp_result_sql)
     # 20190423 wq 函数内注释修复：强制插入换行
     for note_pos in range(len(notes_encode)):
         if re.search(notes_encode[note_pos] + "\r?\n", result_sql) is not None:
