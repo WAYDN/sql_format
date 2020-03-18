@@ -204,12 +204,11 @@ def sql_format(sql, is_comma_trans=False, space_num=2):
         else:
             pass
         tmp_sql = re.sub(pattern, repl_str, tmp_sql)
-    # 20190321 wq 优化符号的处理，例如"100 * -1"
+    # 20190321 wq 优化符号的处理
     tmp_sql = re.sub(r'(?<=\[|\]|,|\(|\))\s*(?=\[|\]|,|\(|\))', '', tmp_sql)
     tmp_sql = re.sub(r'(?<=!|=|<|>)\s*(?=!|=|<|>)', '', tmp_sql)
-    # 字段中符号开头
-    tmp_sql = re.sub(r'(?<=,\s(\+|-))\s*(?!-)', '', tmp_sql)
-    tmp_sql = re.sub(r'(?<=(\+|-|\*|/|=|<|>)\s(\+|-))\s*', '', tmp_sql)
+    # 字段中符号开头，例如"100 * -1"
+    tmp_sql = re.sub(r'(?<=\D\s(\+|-))\s*', '', tmp_sql)
     # 20190326 wq 修复子查询的问题
     tmp_sql = tmp_sql.replace('(--', '( --').replace('(select ', '( select ')
     # 20190312 wq 关键字后直接接左括号
@@ -274,8 +273,8 @@ def sql_format(sql, is_comma_trans=False, space_num=2):
 if __name__ == '__main__':
     exec_sql = [
         """
-        with asss as (select 123),dds as (select 123),da as (select 321)
-select regexp_extract(map_col, 'from_sign_id":"([^2]+)"', 1), case when coalesce(from_object, '') not in ('icon', '') then from_object else from_resourceid end as from_content, count(1) from pdw.fact_stock_em_web_log 
+        with asss as (select 123),dds as (select -123),da as (select 321) --123
+select 1+1, -1-2, 1*-2 , +   +1 regexp_extract(map_col, 'from_sign_id":"([^2]+)"', 1), case when coalesce(from_object, '') not in ('icon', '') then -12+-25 else -123*-2 end as from_content, count(1) from pdw.fact_stock_em_web_log 
 where hp_stat_date between '2019-11-01' and '2019-11-28' and objects rlike '^(ssbb|neican)_\\d+$' and user_id <> 0 group by 1
         """
     ]
