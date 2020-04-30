@@ -152,7 +152,7 @@ def sql_split(sql, is_comma_trans=False, space_num=2):
                 exec_sql[exec_sql_pos] = re.sub(r'^\s*(\w*)\s*', 'lateral ', exec_sql[exec_sql_pos])
             else:
                 if first_value != ')':
-                    if re.search(r'^\w+ as \($', exec_sql[exec_sql_pos]):
+                    if re.search(r'^\w+ as \((\s*--.*)?$', exec_sql[exec_sql_pos]):
                         exec_sql[exec_sql_pos] = (6 + space_num) * " " + exec_sql[exec_sql_pos]
                     else:
                         exec_sql[exec_sql_pos] = re.sub(r'^\s*(--|\w*)\s*', first_value.rjust(6) + space_num * " ",
@@ -273,7 +273,10 @@ def sql_format(sql, is_comma_trans=False, space_num=2):
 if __name__ == '__main__':
     exec_sql = [
         """
-        with asss as (select 123),dds as (select -123),da as (select 321) --123
+        with asss as (
+        select 123),
+        dds as ( --fesfa
+        select -123),da as (select 321) --123
 select 1+1, -1-2, 1*-2 , +   +1 regexp_extract(map_col, 'from_sign_id":"([^2]+)"', 1), case when coalesce(from_object, '') not in ('icon', '') then -12+-25 else -123*-2 end as from_content, count(1) from pdw.fact_stock_em_web_log 
 where hp_stat_date between '2019-11-01' and '2019-11-28' and objects rlike '^(ssbb|neican)_\\d+$' and user_id <> 0 group by 1
         """
