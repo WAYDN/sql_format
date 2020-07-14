@@ -182,9 +182,11 @@ def sql_format(sql, is_comma_trans=False, space_num=2):
         sql = sql.replace(notes[note_pos], '--' + notes_encode[note_pos])
     # 20190924 wq 引用符中的内容 处理【引用涉及字段引用，因此与注释分开去处理】
     quotes = list(set([i[0] for i in re.findall(r'((\'(.|\n)*?\')|(`(.|\n)*?`)|(\"(.|\n)*?\"))', sql)]))
-    quotes_encode = ['y' + str(random.randint(1000000, 10000000)) + 'y' for i in quotes]
+    # 20200714 wq 消引用符前无空格的情况
+    quotes_encode = [' y' + str(random.randint(1000000, 10000000)) + 'y' for i in quotes]
     for quote_pos in range(len(quotes)):
         sql = sql.replace(quotes[quote_pos], quotes_encode[quote_pos])
+        quotes_encode[quote_pos] = quotes_encode[quote_pos].strip()
     # 统一空白符
     sql = ' ' + re.sub(r'\s+', ' ', sql).strip() + ' '
     tmp_sql = sql.lower()
