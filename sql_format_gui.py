@@ -15,30 +15,42 @@ class SqlFormat(wx.Frame):
         self.SetBackgroundColour("#FFFFFF")
         self.Center()
 
-        # 菜单栏设置
         self.menu_bar = wx.MenuBar()
+        # 菜单栏-文件
+        self.file_menu = wx.Menu()
+        self.search_menu = wx.MenuItem(self.file_menu, 11, "搜索", kind=wx.ITEM_NORMAL)
+        self.file_menu.Append(self.search_menu)
+
+        # 菜单栏-设置
         self.set_menu = wx.Menu()
-        self.font_menu = wx.MenuItem(self.set_menu, 1, "字体", kind=wx.ITEM_NORMAL)
-        self.comma_menu = wx.MenuItem(self.set_menu, 4, "逗号前置", kind=wx.ITEM_CHECK)
-        self.table_menu = wx.MenuItem(self.set_menu, 5, "输出表名", kind=wx.ITEM_CHECK)
+        self.font_menu = wx.MenuItem(self.set_menu, 21, "字体", kind=wx.ITEM_NORMAL)
+        self.comma_menu = wx.MenuItem(self.set_menu, 22, "逗号前置", kind=wx.ITEM_CHECK)
+        self.table_menu = wx.MenuItem(self.set_menu, 23, "输出表名", kind=wx.ITEM_CHECK)
         # 后续考虑改成输入框，用户自定义关键词后续的空格个数
-        self.space_menu = wx.MenuItem(self.set_menu, 7, "单空格", kind=wx.ITEM_CHECK)
+        self.space_menu = wx.MenuItem(self.set_menu, 24, "单空格", kind=wx.ITEM_CHECK)
         self.set_menu.Append(self.font_menu)
         self.set_menu.AppendSeparator()
         self.set_menu.Append(self.comma_menu)
         self.set_menu.Append(self.table_menu)
         self.set_menu.Append(self.space_menu)
 
+        # 菜单栏-显示
         self.show_menu = wx.Menu()
-        self.show_space_menu = wx.MenuItem(self.set_menu, 2, "显示空格", kind=wx.ITEM_CHECK)
-        self.wrap_menu = wx.MenuItem(self.set_menu, 3, "自动换行", kind=wx.ITEM_CHECK)
-        self.kw_tip_menu = wx.MenuItem(self.set_menu, 6, "关键词提示", kind=wx.ITEM_CHECK)
+        self.show_space_menu = wx.MenuItem(self.set_menu, 31, "显示空格", kind=wx.ITEM_CHECK)
+        self.wrap_menu = wx.MenuItem(self.set_menu, 32, "自动换行", kind=wx.ITEM_CHECK)
+        self.kw_tip_menu = wx.MenuItem(self.set_menu, 33, "关键词提示", kind=wx.ITEM_CHECK)
         self.show_menu.Append(self.show_space_menu)
         self.show_menu.Append(self.wrap_menu)
         self.show_menu.AppendSeparator()
         self.show_menu.Append(self.kw_tip_menu)
 
+        self.menu_bar.Append(self.file_menu, title="文件")
+        self.menu_bar.Append(self.set_menu, title="设置")
+        self.menu_bar.Append(self.show_menu, title="显示")
+        self.SetMenuBar(self.menu_bar)
+
         # 菜单动作
+        self.file_menu.Bind(wx.EVT_MENU, self.event_menu)
         self.set_menu.Bind(wx.EVT_MENU, self.event_menu)
         self.show_menu.Bind(wx.EVT_MENU, self.event_menu)
 
@@ -55,10 +67,6 @@ class SqlFormat(wx.Frame):
             self.kw_tip_menu.Check(int(set_data['kw_tip']))
         else:
             self.set_info.add_section('set_info')
-
-        self.menu_bar.Append(self.set_menu, title="设置")
-        self.menu_bar.Append(self.show_menu, title="显示")
-        self.SetMenuBar(self.menu_bar)
 
         self.sf_panel = wx.Panel(self)
         self.sf_panel.SetBackgroundColour('#F5F5F5')
@@ -194,14 +202,7 @@ class SqlFormat(wx.Frame):
                 self.sql_text.AutoCompCancel()
             last_pos = current_pos
 
-    def button_enter(self, event):
-        self.button.SetBackgroundColour("#338BB8")
-        self.button.SetForegroundColour("#FFFFFF")
-
-    def button_leave(self, event):
-        self.button.SetBackgroundColour(self.button_bc)
-        self.button.SetForegroundColour(self.button_fc)
-
+    # 执行格式化
     def exec_format(self, event):
         source_sql = self.sql_text.GetValue()
         try:
@@ -217,17 +218,21 @@ class SqlFormat(wx.Frame):
         except Exception as a:
             self.sql_text.SetValue("调用出现问题:{0}".format(a))
 
+    # 菜单栏配置
     def event_menu(self, event):
         event_id = event.GetId()
-        if event_id == 1:
+        if event_id == 11:
+            self.search(event)
+        elif event_id == 21:
+            # 字体设置对话框
             dlg = wx.FontDialog()
             if dlg.ShowModal() == wx.ID_OK:
                 data = dlg.GetFontData()
                 self.sql_text.StyleSetFont(stc.STC_SQL_IDENTIFIER, data.GetChosenFont())
             dlg.Destroy()
-        elif event_id == 2:
+        elif event_id == 31:
             self.sql_text.SetViewWhiteSpace(self.show_space_menu.IsChecked())
-        elif event_id == 3:
+        elif event_id == 32:
             self.sql_text.SetWrapMode(self.wrap_menu.IsChecked())
         self.set_info.set('set_info', 'comma', str(int(self.comma_menu.IsChecked())))
         self.set_info.set('set_info', 'table', str(int(self.table_menu.IsChecked())))
@@ -236,6 +241,32 @@ class SqlFormat(wx.Frame):
         self.set_info.set('set_info', 'wrap', str(int(self.wrap_menu.IsChecked())))
         self.set_info.set('set_info', 'kw_tip', str(int(self.kw_tip_menu.IsChecked())))
         self.set_info.write(open('set_info.ini', 'w+', encoding="utf-8"))
+
+    # 搜索替换对话框
+    def search(self, event):
+        dlg = wx.FindReplaceDialog(self, wx.FindReplaceData(), u"查找替换", wx.FR_REPLACEDIALOG)
+        dlg.Bind(wx.EVT_FIND, self.find)
+        dlg.Bind(wx.EVT_FIND_NEXT, self.find)
+        dlg.Show()
+
+    def find(self, event):
+        min_pos = self.sql_text.GetCurrentPos()
+        search_text = event.GetFindString()
+        search_len = len(search_text.encode("utf-8"))
+        text_len = len(self.sql_text.GetValue())
+        start_pos = self.sql_text.FindText(min_pos, text_len, search_text)
+        self.sql_text.MoveCaretInsideView()
+        print(min_pos, text_len, search_text, search_len)
+        self.sql_text.SetSelection(start_pos, start_pos + search_len)
+
+    # 按钮样式
+    def button_enter(self, event):
+        self.button.SetBackgroundColour("#338BB8")
+        self.button.SetForegroundColour("#FFFFFF")
+
+    def button_leave(self, event):
+        self.button.SetBackgroundColour(self.button_bc)
+        self.button.SetForegroundColour(self.button_fc)
 
 
 app = wx.App()
