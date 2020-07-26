@@ -18,7 +18,7 @@ class SqlFormat(wx.Frame):
         self.menu_bar = wx.MenuBar()
         # 菜单栏-文件
         self.file_menu = wx.Menu()
-        self.search_menu = wx.MenuItem(self.file_menu, 11, "搜索", kind=wx.ITEM_NORMAL)
+        self.search_menu = wx.MenuItem(self.file_menu, 11, u"查找||替换", kind=wx.ITEM_NORMAL)
         self.file_menu.Append(self.search_menu)
 
         # 菜单栏-设置
@@ -53,6 +53,10 @@ class SqlFormat(wx.Frame):
         self.file_menu.Bind(wx.EVT_MENU, self.event_menu)
         self.set_menu.Bind(wx.EVT_MENU, self.event_menu)
         self.show_menu.Bind(wx.EVT_MENU, self.event_menu)
+        # 菜单搜索动作
+        self.Bind(wx.EVT_FIND, self.find)
+        self.Bind(wx.EVT_FIND_NEXT, self.find)
+        self.Bind(wx.EVT_FIND_REPLACE, self.replace)
 
         # 读取预设变量
         self.set_info = configparser.ConfigParser()
@@ -222,14 +226,14 @@ class SqlFormat(wx.Frame):
     def event_menu(self, event):
         event_id = event.GetId()
         if event_id == 11:
-            self.search(event)
+            self.find_replace(self.sql_text.GetSelectedText())
         elif event_id == 21:
             # 字体设置对话框
-            dlg = wx.FontDialog()
-            if dlg.ShowModal() == wx.ID_OK:
-                data = dlg.GetFontData()
+            font_dlg = wx.FontDialog()
+            if font_dlg.ShowModal() == wx.ID_OK:
+                data = font_dlg.GetFontData()
                 self.sql_text.StyleSetFont(stc.STC_SQL_IDENTIFIER, data.GetChosenFont())
-            dlg.Destroy()
+            font_dlg.Destroy()
         elif event_id == 31:
             self.sql_text.SetViewWhiteSpace(self.show_space_menu.IsChecked())
         elif event_id == 32:
@@ -242,22 +246,29 @@ class SqlFormat(wx.Frame):
         self.set_info.set('set_info', 'kw_tip', str(int(self.kw_tip_menu.IsChecked())))
         self.set_info.write(open('set_info.ini', 'w+', encoding="utf-8"))
 
-    # 搜索替换对话框
-    def search(self, event):
-        dlg = wx.FindReplaceDialog(self, wx.FindReplaceData(), u"查找替换", wx.FR_REPLACEDIALOG)
-        dlg.Bind(wx.EVT_FIND, self.find)
-        dlg.Bind(wx.EVT_FIND_NEXT, self.find)
-        dlg.Show()
+    # 查找替换对话框
+    def find_replace(self, search_text):
+        data = wx.FindReplaceData()
+        data.SetFindString(search_text)
+        find_replace_dlg = wx.FindReplaceDialog(self, wx.FindReplaceData(), u"查找替换", wx.FR_REPLACEDIALOG)
+        find_replace_dlg.Show()
+        # 重置sql_text 避免对话框崩溃，具体崩溃原因待定
+        self.sql_text.SetValue(self.sql_text.GetValue())
 
     def find(self, event):
         min_pos = self.sql_text.GetCurrentPos()
-        search_text = event.GetFindString()
-        search_len = len(search_text.encode("utf-8"))
-        text_len = len(self.sql_text.GetValue())
-        start_pos = self.sql_text.FindText(min_pos, text_len, search_text)
+        find_text = event.GetFindString()
+        find_len = len(find_text.encode("utf-8"))
+        text_len = self.sql_text.GetTextLength()
+        start_pos = self.sql_text.FindText(min_pos, text_len, find_text)
+        if start_pos == -1:
+            start_pos = self.sql_text.FindText(0, text_len, find_text)
+        self.sql_text.SetSelection(start_pos, start_pos + find_len)
         self.sql_text.MoveCaretInsideView()
-        print(min_pos, text_len, search_text, search_len)
-        self.sql_text.SetSelection(start_pos, start_pos + search_len)
+
+    def replace(self, event):
+        find_text = event.GetFindString()
+        replace_text = event.GetReplaceString()
 
     # 按钮样式
     def button_enter(self, event):
