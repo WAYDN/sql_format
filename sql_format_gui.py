@@ -252,10 +252,10 @@ class SqlFormat(wx.Frame):
         data.SetFindString(search_text)
         find_replace_dlg = wx.FindReplaceDialog(self, wx.FindReplaceData(), u"查找替换", wx.FR_REPLACEDIALOG)
         find_replace_dlg.Show()
-        # 重置sql_text 避免对话框崩溃，具体崩溃原因待定
-        self.sql_text.SetValue(self.sql_text.GetValue())
 
     def find(self, event):
+        # 重置sql_text 避免对话框崩溃，具体崩溃原因待定
+        self.sql_text.SetValue(self.sql_text.GetValue())
         min_pos = self.sql_text.GetCurrentPos()
         find_text = event.GetFindString()
         find_len = len(find_text.encode("utf-8"))
@@ -267,8 +267,16 @@ class SqlFormat(wx.Frame):
         self.sql_text.MoveCaretInsideView()
 
     def replace(self, event):
+        min_pos = self.sql_text.GetCurrentPos()
         find_text = event.GetFindString()
         replace_text = event.GetReplaceString()
+        find_len = len(find_text.encode("utf-8"))
+        text_len = self.sql_text.GetTextLength()
+        start_pos = self.sql_text.FindText(min_pos, text_len, find_text)
+        if start_pos == -1:
+            start_pos = self.sql_text.FindText(0, text_len, find_text)
+        self.sql_text.SetSelection(start_pos, start_pos + find_len)
+        self.sql_text.ReplaceSelectionRaw(replace_text)
 
     # 按钮样式
     def button_enter(self, event):
