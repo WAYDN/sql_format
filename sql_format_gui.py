@@ -6,6 +6,7 @@ import sql_format_exec
 import re
 import os
 import configparser
+import time
 
 
 class SqlFormat(wx.Frame):
@@ -18,7 +19,7 @@ class SqlFormat(wx.Frame):
         self.menu_bar = wx.MenuBar()
         # 菜单栏-文件
         self.file_menu = wx.Menu()
-        self.search_menu = wx.MenuItem(self.file_menu, 11, u"查找||替换", kind=wx.ITEM_NORMAL)
+        self.search_menu = wx.MenuItem(self.file_menu, 11, u"查找||替换\tCtrl+F", kind=wx.ITEM_NORMAL)
         self.file_menu.Append(self.search_menu)
 
         # 菜单栏-设置
@@ -53,10 +54,6 @@ class SqlFormat(wx.Frame):
         self.file_menu.Bind(wx.EVT_MENU, self.event_menu)
         self.set_menu.Bind(wx.EVT_MENU, self.event_menu)
         self.show_menu.Bind(wx.EVT_MENU, self.event_menu)
-        # 菜单搜索动作
-        self.Bind(wx.EVT_FIND, self.find)
-        self.Bind(wx.EVT_FIND_NEXT, self.find)
-        self.Bind(wx.EVT_FIND_REPLACE, self.replace)
 
         # 读取预设变量
         self.set_info = configparser.ConfigParser()
@@ -75,6 +72,7 @@ class SqlFormat(wx.Frame):
         self.sf_panel = wx.Panel(self)
         self.sf_panel.SetBackgroundColour('#F5F5F5')
 
+        # 文本设置
         self.sql_text = stc.StyledTextCtrl(self.sf_panel, style=wx.TE_MULTILINE | wx.HSCROLL | wx.TE_RICH)
         self.sql_text.SetMarginType(1, stc.STC_MARGIN_NUMBER)
         self.sql_text.SetMarginWidth(1, 25)
@@ -101,7 +99,6 @@ class SqlFormat(wx.Frame):
         self.sql_text.StyleSetSpec(stc.STC_SQL_OPERATOR, "fore:#1C86EE")
         # 标识符[所有其他字符]
         self.sql_text.StyleSetSpec(stc.STC_SQL_IDENTIFIER, "fore:#000000,face:Consolas")
-
         self.sql_text.SetCaretLineVisible(True)
         self.sql_text.SetCaretLineBackground("#F0F8FF")
         self.sql_text.SetValue(u"""
@@ -134,6 +131,53 @@ class SqlFormat(wx.Frame):
         self.button.Bind(wx.EVT_ENTER_WINDOW, self.button_enter)
         self.button.Bind(wx.EVT_LEAVE_WINDOW, self.button_leave)
         self.button.Bind(wx.EVT_BUTTON, self.exec_format)
+
+        # 查找&替换对话框 --查找/替换，向上/向下，区分大小写
+        self.find_replace_dialog = wx.Dialog(self.sf_panel, title='查找&替换', size=(500, 180),
+                                             style=wx.DEFAULT_DIALOG_STYLE)
+        self.find_replace_dialog.Position = (self.Position[0] + self.Size[0] / 2 - self.find_replace_dialog.Size[0] / 2,
+                                             self.Position[1] + self.Size[1] / 2 - self.find_replace_dialog.Size[1] / 2)
+        self.find_replace_dialog_panel = wx.Panel(self.find_replace_dialog)
+        self.find_lable = wx.StaticText(parent=self.find_replace_dialog_panel, label='查找内容:')
+        self.find_text = wx.TextCtrl(parent=self.find_replace_dialog_panel)
+        self.find_button = wx.Button(parent=self.find_replace_dialog_panel, label='查找')
+        self.replace_lable = wx.StaticText(parent=self.find_replace_dialog_panel, label='替换内容:')
+        self.replace_text = wx.TextCtrl(parent=self.find_replace_dialog_panel)
+        self.replace_button = wx.Button(parent=self.find_replace_dialog_panel, label='替换')
+        self.direction_box = wx.RadioBox(parent=self.find_replace_dialog_panel, label='方向', choices=['向上', '向下'],
+                                         style=wx.RA_SPECIFY_COLS)
+        self.direction_box.SetSelection(1)
+        self.case_sensitive_box = wx.CheckBox(parent=self.find_replace_dialog_panel, label='区分大小写')
+
+        # 查找&替换对话框布局
+        self.find_replace_dialog_vbox1 = wx.BoxSizer()
+        self.find_replace_dialog_vbox1.Add(self.find_lable, proportion=0, flag=wx.ALL | wx.ALIGN_CENTER, border=5)
+        self.find_replace_dialog_vbox1.Add(self.find_text, proportion=1, flag=wx.ALIGN_CENTER | wx.RIGHT, border=5)
+        self.find_replace_dialog_vbox1.Add(self.find_button, proportion=0, flag=wx.ALIGN_CENTER | wx.LEFT, border=5)
+        self.find_replace_dialog_vbox2 = wx.BoxSizer()
+        self.find_replace_dialog_vbox2.Add(self.replace_lable, proportion=0, flag=wx.ALL | wx.ALIGN_CENTER, border=5)
+        self.find_replace_dialog_vbox2.Add(self.replace_text, proportion=1, flag=wx.ALIGN_CENTER | wx.RIGHT, border=5)
+        self.find_replace_dialog_vbox2.Add(self.replace_button, proportion=0, flag=wx.ALIGN_CENTER | wx.LEFT, border=5)
+        self.direction_vbox = wx.BoxSizer()
+        self.direction_vbox.Add(self.direction_box)
+        self.case_sensitive_vbox = wx.BoxSizer()
+        self.case_sensitive_vbox.Add(self.case_sensitive_box)
+        self.find_replace_dialog_vbox3 = wx.BoxSizer()
+        self.find_replace_dialog_vbox3.Add(self.direction_vbox, proportion=1, flag=wx.ALL | wx.ALIGN_CENTER, border=5)
+        self.find_replace_dialog_vbox3.Add(self.case_sensitive_vbox, proportion=0, flag=wx.ALL | wx.ALIGN_CENTER,
+                                           border=5)
+        self.find_replace_dialog_hbox = wx.BoxSizer(wx.VERTICAL)
+        self.find_replace_dialog_hbox.Add(self.find_replace_dialog_vbox1, flag=wx.TOP | wx.EXPAND, border=5)
+        self.find_replace_dialog_hbox.Add(self.find_replace_dialog_vbox2, flag=wx.TOP | wx.EXPAND, border=5)
+        self.find_replace_dialog_hbox.Add(self.find_replace_dialog_vbox3, flag=wx.TOP | wx.EXPAND, border=5)
+        self.find_replace_dialog_panel.SetSizer(self.find_replace_dialog_hbox)
+        # 查找&替换对话框动作
+        self.find_button.Bind(wx.EVT_BUTTON, self.find)
+        self.replace_button.Bind(wx.EVT_BUTTON, self.replace)
+
+        # 快捷键
+        keyboard_cf = wx.AcceleratorTable([(wx.ACCEL_CTRL, ord('f'), self.search_menu.GetId())])
+        self.SetAcceleratorTable(keyboard_cf)
 
         # 布局
         self.v_box = wx.BoxSizer(wx.VERTICAL)
@@ -226,9 +270,8 @@ class SqlFormat(wx.Frame):
     def event_menu(self, event):
         event_id = event.GetId()
         if event_id == 11:
-            self.find_replace(self.sql_text.GetSelectedText())
+            self.find_replace_dialog.Show()
         elif event_id == 21:
-            # 字体设置对话框
             font_dlg = wx.FontDialog()
             if font_dlg.ShowModal() == wx.ID_OK:
                 data = font_dlg.GetFontData()
@@ -246,37 +289,63 @@ class SqlFormat(wx.Frame):
         self.set_info.set('set_info', 'kw_tip', str(int(self.kw_tip_menu.IsChecked())))
         self.set_info.write(open('set_info.ini', 'w+', encoding="utf-8"))
 
-    # 查找替换对话框
-    def find_replace(self, search_text):
-        data = wx.FindReplaceData()
-        data.SetFindString(search_text)
-        find_replace_dlg = wx.FindReplaceDialog(self, wx.FindReplaceData(), u"查找替换", wx.FR_REPLACEDIALOG)
-        find_replace_dlg.Show()
-
     def find(self, event):
-        # 重置sql_text 避免对话框崩溃，具体崩溃原因待定
-        self.sql_text.SetValue(self.sql_text.GetValue())
-        min_pos = self.sql_text.GetCurrentPos()
-        find_text = event.GetFindString()
-        find_len = len(find_text.encode("utf-8"))
-        text_len = self.sql_text.GetTextLength()
-        start_pos = self.sql_text.FindText(min_pos, text_len, find_text)
-        if start_pos == -1:
-            start_pos = self.sql_text.FindText(0, text_len, find_text)
-        self.sql_text.SetSelection(start_pos, start_pos + find_len)
+        if self.case_sensitive_box.IsChecked():
+            flags = 5
+        else:
+            flags = 0
+        curr_pos = self.sql_text.GetCurrentPos()
+        self.sql_text.SetSelection(curr_pos, curr_pos)
+        find_object = self.find_text.GetValue().encode("utf-8")
+        find_len = len(find_object)
+        sql_content = self.sql_text.GetValue().encode('utf-8')
+        sql_len = len(sql_content)
+        direction = self.direction_box.GetSelection()
+        if direction == 0:
+            curr_pos = curr_pos - find_len
+            max_pos = 0
+        else:
+            max_pos = sql_len
+        curr_pos = self.sql_text.FindText(curr_pos, max_pos, find_object, flags)
+        if curr_pos == -1 and direction == 1:
+            curr_pos = self.sql_text.FindText(0, sql_len, find_object, flags)
+        elif curr_pos == -1 and direction == 0:
+            curr_pos = self.sql_text.FindText(sql_len, 0, find_object, flags)
+        if curr_pos != -1:
+            self.sql_text.SetSelection(curr_pos, curr_pos + find_len)
         self.sql_text.MoveCaretInsideView()
 
     def replace(self, event):
-        min_pos = self.sql_text.GetCurrentPos()
-        find_text = event.GetFindString()
-        replace_text = event.GetReplaceString()
-        find_len = len(find_text.encode("utf-8"))
-        text_len = self.sql_text.GetTextLength()
-        start_pos = self.sql_text.FindText(min_pos, text_len, find_text)
-        if start_pos == -1:
-            start_pos = self.sql_text.FindText(0, text_len, find_text)
-        self.sql_text.SetSelection(start_pos, start_pos + find_len)
-        self.sql_text.ReplaceSelectionRaw(replace_text)
+        if self.case_sensitive_box.IsChecked():
+            flags = 5
+        else:
+            flags = 0
+        curr_pos = self.sql_text.GetCurrentPos()
+        self.sql_text.SetSelection(curr_pos, curr_pos)
+        find_object = self.find_text.GetValue().encode("utf-8")
+        find_len = len(find_object)
+        replace_object = self.replace_text.GetValue().encode("utf-8")
+        replace_len = len(replace_object)
+        sql_content = self.sql_text.GetValue().encode('utf-8')
+        sql_len = len(sql_content)
+        direction = self.direction_box.GetSelection()
+        if direction == 0:
+            curr_pos = curr_pos - find_len
+            max_pos = 0
+        else:
+            max_pos = sql_len
+        curr_pos = self.sql_text.FindText(curr_pos, max_pos, find_object, flags)
+        if curr_pos == -1 and direction == 1:
+            curr_pos = self.sql_text.FindText(0, sql_len, find_object, flags)
+        elif curr_pos == -1 and direction == 0:
+            curr_pos = self.sql_text.FindText(sql_len, 0, find_object, flags)
+        if curr_pos != -1:
+            self.sql_text.SetValue(sql_content[:curr_pos] + replace_object + sql_content[curr_pos + find_len:])
+            self.sql_text.SetSelection(curr_pos, curr_pos + replace_len)
+        self.sql_text.MoveCaretInsideView()
+
+    def dlg_close(self, event):
+        self.find_replace_dlg.EndModal(wx.ID_OK)
 
     # 按钮样式
     def button_enter(self, event):
@@ -288,6 +357,7 @@ class SqlFormat(wx.Frame):
         self.button.SetForegroundColour(self.button_fc)
 
 
-app = wx.App()
-SqlFormat()
-app.MainLoop()
+if __name__ == '__main__':
+    app = wx.App()
+    SqlFormat()
+    app.MainLoop()
