@@ -9,71 +9,19 @@ import configparser
 import time
 
 
-class SqlFormat(wx.Frame):
-    def __init__(self):
-        super(SqlFormat, self).__init__(None, title='SQL格式助手', size=(640, 480), style=wx.DEFAULT_FRAME_STYLE)
-        self.SetIcon(wx.Icon('sql_format.ico'))
-        self.SetBackgroundColour("#FFFFFF")
-        self.Center()
-
-        self.menu_bar = wx.MenuBar()
-        # 菜单栏-文件
-        self.file_menu = wx.Menu()
-        self.search_menu = wx.MenuItem(self.file_menu, 11, u"查找||替换\tCtrl+F", kind=wx.ITEM_NORMAL)
-        self.file_menu.Append(self.search_menu)
-
-        # 菜单栏-设置
-        self.set_menu = wx.Menu()
-        self.font_menu = wx.MenuItem(self.set_menu, 21, "字体", kind=wx.ITEM_NORMAL)
-        self.comma_menu = wx.MenuItem(self.set_menu, 22, "逗号前置", kind=wx.ITEM_CHECK)
-        self.table_menu = wx.MenuItem(self.set_menu, 23, "输出表名", kind=wx.ITEM_CHECK)
-        # 后续考虑改成输入框，用户自定义关键词后续的空格个数
-        self.space_menu = wx.MenuItem(self.set_menu, 24, "单空格", kind=wx.ITEM_CHECK)
-        self.set_menu.Append(self.font_menu)
-        self.set_menu.AppendSeparator()
-        self.set_menu.Append(self.comma_menu)
-        self.set_menu.Append(self.table_menu)
-        self.set_menu.Append(self.space_menu)
-
-        # 菜单栏-显示
-        self.show_menu = wx.Menu()
-        self.show_space_menu = wx.MenuItem(self.set_menu, 31, "显示空格", kind=wx.ITEM_CHECK)
-        self.wrap_menu = wx.MenuItem(self.set_menu, 32, "自动换行", kind=wx.ITEM_CHECK)
-        self.kw_tip_menu = wx.MenuItem(self.set_menu, 33, "关键词提示", kind=wx.ITEM_CHECK)
-        self.show_menu.Append(self.show_space_menu)
-        self.show_menu.Append(self.wrap_menu)
-        self.show_menu.AppendSeparator()
-        self.show_menu.Append(self.kw_tip_menu)
-
-        self.menu_bar.Append(self.file_menu, title="文件")
-        self.menu_bar.Append(self.set_menu, title="设置")
-        self.menu_bar.Append(self.show_menu, title="显示")
-        self.SetMenuBar(self.menu_bar)
-
-        # 菜单动作
-        self.file_menu.Bind(wx.EVT_MENU, self.event_menu)
-        self.set_menu.Bind(wx.EVT_MENU, self.event_menu)
-        self.show_menu.Bind(wx.EVT_MENU, self.event_menu)
-
-        # 读取预设变量
-        self.set_info = configparser.ConfigParser()
-        if os.path.exists('set_info.ini'):
-            self.set_info.read('set_info.ini')
-            set_data = dict(self.set_info.items('set_info'))
-            self.comma_menu.Check(int(set_data['comma']))
-            self.table_menu.Check(int(set_data['table']))
-            self.space_menu.Check(int(set_data['space']))
-            self.show_space_menu.Check(int(set_data['show_space']))
-            self.wrap_menu.Check(int(set_data['wrap']))
-            self.kw_tip_menu.Check(int(set_data['kw_tip']))
-        else:
-            self.set_info.add_section('set_info')
-
-        self.sf_panel = wx.Panel(self)
-        self.sf_panel.SetBackgroundColour('#F5F5F5')
+class SqlFormatPanel(wx.Panel):
+    def __init__(self, parent, comma_menu, table_menu, space_menu, show_space_menu, wrap_menu, kw_tip_menu):
+        super(SqlFormatPanel, self).__init__(parent)
+        self.SetBackgroundColour('#F5F5F5')
+        self.comma_menu = comma_menu
+        self.table_menu = table_menu
+        self.space_menu = space_menu
+        self.show_space_menu = show_space_menu
+        self.wrap_menu = wrap_menu
+        self.kw_tip_menu = kw_tip_menu
 
         # 文本设置
-        self.sql_text = stc.StyledTextCtrl(self.sf_panel, style=wx.TE_MULTILINE | wx.HSCROLL | wx.TE_RICH)
+        self.sql_text = stc.StyledTextCtrl(self, style=wx.TE_MULTILINE | wx.HSCROLL | wx.TE_RICH)
         self.sql_text.SetMarginType(1, stc.STC_MARGIN_NUMBER)
         self.sql_text.SetMarginWidth(1, 25)
         self.sql_text.StyleSetFontAttr(0, 10, "Consolas", False, False, False)
@@ -122,7 +70,7 @@ class SqlFormat(wx.Frame):
         self.sql_text.Bind(wx.EVT_KEY_UP, self.keyword_tip)
 
         # 按钮控件
-        self.button = wx.Button(self.sf_panel, label="格式化", style=wx.Center)
+        self.button = wx.Button(self, label="格式化", style=wx.Center)
         self.button.SetWindowStyleFlag(wx.NO_BORDER)
         self.button.SetDefault()
         self.button_bc = self.button.GetBackgroundColour()
@@ -132,60 +80,11 @@ class SqlFormat(wx.Frame):
         self.button.Bind(wx.EVT_LEAVE_WINDOW, self.button_leave)
         self.button.Bind(wx.EVT_BUTTON, self.exec_format)
 
-        # 查找&替换对话框 --查找/替换，向上/向下，区分大小写
-        self.find_replace_dialog = wx.Dialog(self.sf_panel, title='查找&替换', size=(500, 180),
-                                             style=wx.DEFAULT_DIALOG_STYLE)
-        self.find_replace_dialog.Position = (self.Position[0] + self.Size[0] / 2 - self.find_replace_dialog.Size[0] / 2,
-                                             self.Position[1] + self.Size[1] / 2 - self.find_replace_dialog.Size[1] / 2)
-        self.find_replace_dialog_panel = wx.Panel(self.find_replace_dialog)
-        self.find_lable = wx.StaticText(parent=self.find_replace_dialog_panel, label='查找内容:')
-        self.find_text = wx.TextCtrl(parent=self.find_replace_dialog_panel)
-        self.find_button = wx.Button(parent=self.find_replace_dialog_panel, label='查找')
-        self.replace_lable = wx.StaticText(parent=self.find_replace_dialog_panel, label='替换内容:')
-        self.replace_text = wx.TextCtrl(parent=self.find_replace_dialog_panel)
-        self.replace_button = wx.Button(parent=self.find_replace_dialog_panel, label='替换')
-        self.direction_box = wx.RadioBox(parent=self.find_replace_dialog_panel, label='方向', choices=['向上', '向下'],
-                                         style=wx.RA_SPECIFY_COLS)
-        self.direction_box.SetSelection(1)
-        self.case_sensitive_box = wx.CheckBox(parent=self.find_replace_dialog_panel, label='区分大小写')
-
-        # 查找&替换对话框布局
-        self.find_replace_dialog_vbox1 = wx.BoxSizer()
-        self.find_replace_dialog_vbox1.Add(self.find_lable, proportion=0, flag=wx.ALL | wx.ALIGN_CENTER, border=5)
-        self.find_replace_dialog_vbox1.Add(self.find_text, proportion=1, flag=wx.ALIGN_CENTER | wx.RIGHT, border=5)
-        self.find_replace_dialog_vbox1.Add(self.find_button, proportion=0, flag=wx.ALIGN_CENTER | wx.LEFT, border=5)
-        self.find_replace_dialog_vbox2 = wx.BoxSizer()
-        self.find_replace_dialog_vbox2.Add(self.replace_lable, proportion=0, flag=wx.ALL | wx.ALIGN_CENTER, border=5)
-        self.find_replace_dialog_vbox2.Add(self.replace_text, proportion=1, flag=wx.ALIGN_CENTER | wx.RIGHT, border=5)
-        self.find_replace_dialog_vbox2.Add(self.replace_button, proportion=0, flag=wx.ALIGN_CENTER | wx.LEFT, border=5)
-        self.direction_vbox = wx.BoxSizer()
-        self.direction_vbox.Add(self.direction_box)
-        self.case_sensitive_vbox = wx.BoxSizer()
-        self.case_sensitive_vbox.Add(self.case_sensitive_box)
-        self.find_replace_dialog_vbox3 = wx.BoxSizer()
-        self.find_replace_dialog_vbox3.Add(self.direction_vbox, proportion=1, flag=wx.ALL | wx.ALIGN_CENTER, border=5)
-        self.find_replace_dialog_vbox3.Add(self.case_sensitive_vbox, proportion=0, flag=wx.ALL | wx.ALIGN_CENTER,
-                                           border=5)
-        self.find_replace_dialog_hbox = wx.BoxSizer(wx.VERTICAL)
-        self.find_replace_dialog_hbox.Add(self.find_replace_dialog_vbox1, flag=wx.TOP | wx.EXPAND, border=5)
-        self.find_replace_dialog_hbox.Add(self.find_replace_dialog_vbox2, flag=wx.TOP | wx.EXPAND, border=5)
-        self.find_replace_dialog_hbox.Add(self.find_replace_dialog_vbox3, flag=wx.TOP | wx.EXPAND, border=5)
-        self.find_replace_dialog_panel.SetSizer(self.find_replace_dialog_hbox)
-        # 查找&替换对话框动作
-        self.find_button.Bind(wx.EVT_BUTTON, self.find)
-        self.replace_button.Bind(wx.EVT_BUTTON, self.replace)
-
-        # 快捷键
-        keyboard_cf = wx.AcceleratorTable([(wx.ACCEL_CTRL, ord('f'), self.search_menu.GetId())])
-        self.SetAcceleratorTable(keyboard_cf)
-
         # 布局
         self.v_box = wx.BoxSizer(wx.VERTICAL)
         self.v_box.Add(self.sql_text, proportion=1, flag=wx.EXPAND)
         self.v_box.Add(self.button, proportion=0, flag=wx.ALIGN_CENTER | wx.ALL, border=5)
-        self.sf_panel.SetSizer(self.v_box)
-
-        self.Show()
+        self.SetSizer(self.v_box)
 
     # 文本高亮
     def highlight(self, event):
@@ -202,7 +101,8 @@ class SqlFormat(wx.Frame):
                 # 重置标色位置
                 # sql_text.BraceBadLight(current_pos)
                 self.sql_text.BraceHighlight(-1, -1)
-        self.sql_text.StyleSetSpec(stc.STC_STYLE_BRACELIGHT, "fore:#000000,back:#87CEFF,face:{0}".format(self.sql_text_face))
+        self.sql_text.StyleSetSpec(stc.STC_STYLE_BRACELIGHT, "fore:#000000,back:#87CEFF,face:{0}".format(
+            self.sql_text_face))
 
         # 选择高亮
         select_context = self.sql_text.GetSelectedText()
@@ -266,87 +166,6 @@ class SqlFormat(wx.Frame):
         except Exception as a:
             self.sql_text.SetValue("调用出现问题:{0}".format(a))
 
-    # 菜单栏配置
-    def event_menu(self, event):
-        event_id = event.GetId()
-        if event_id == 11:
-            self.find_replace_dialog.Show()
-        elif event_id == 21:
-            font_dlg = wx.FontDialog()
-            if font_dlg.ShowModal() == wx.ID_OK:
-                data = font_dlg.GetFontData()
-                self.sql_text.StyleSetFont(stc.STC_SQL_IDENTIFIER, data.GetChosenFont())
-            font_dlg.Destroy()
-        elif event_id == 31:
-            self.sql_text.SetViewWhiteSpace(self.show_space_menu.IsChecked())
-        elif event_id == 32:
-            self.sql_text.SetWrapMode(self.wrap_menu.IsChecked())
-        self.set_info.set('set_info', 'comma', str(int(self.comma_menu.IsChecked())))
-        self.set_info.set('set_info', 'table', str(int(self.table_menu.IsChecked())))
-        self.set_info.set('set_info', 'space', str(int(self.space_menu.IsChecked())))
-        self.set_info.set('set_info', 'show_space', str(int(self.show_space_menu.IsChecked())))
-        self.set_info.set('set_info', 'wrap', str(int(self.wrap_menu.IsChecked())))
-        self.set_info.set('set_info', 'kw_tip', str(int(self.kw_tip_menu.IsChecked())))
-        self.set_info.write(open('set_info.ini', 'w+', encoding="utf-8"))
-
-    def find(self, event):
-        if self.case_sensitive_box.IsChecked():
-            flags = 5
-        else:
-            flags = 0
-        curr_pos = self.sql_text.GetCurrentPos()
-        self.sql_text.SetSelection(curr_pos, curr_pos)
-        find_object = self.find_text.GetValue().encode("utf-8")
-        find_len = len(find_object)
-        sql_content = self.sql_text.GetValue().encode('utf-8')
-        sql_len = len(sql_content)
-        direction = self.direction_box.GetSelection()
-        if direction == 0:
-            curr_pos = curr_pos - find_len
-            max_pos = 0
-        else:
-            max_pos = sql_len
-        curr_pos = self.sql_text.FindText(curr_pos, max_pos, find_object, flags)
-        if curr_pos == -1 and direction == 1:
-            curr_pos = self.sql_text.FindText(0, sql_len, find_object, flags)
-        elif curr_pos == -1 and direction == 0:
-            curr_pos = self.sql_text.FindText(sql_len, 0, find_object, flags)
-        if curr_pos != -1:
-            self.sql_text.SetSelection(curr_pos, curr_pos + find_len)
-        self.sql_text.MoveCaretInsideView()
-
-    def replace(self, event):
-        if self.case_sensitive_box.IsChecked():
-            flags = 5
-        else:
-            flags = 0
-        curr_pos = self.sql_text.GetCurrentPos()
-        self.sql_text.SetSelection(curr_pos, curr_pos)
-        find_object = self.find_text.GetValue().encode("utf-8")
-        find_len = len(find_object)
-        replace_object = self.replace_text.GetValue().encode("utf-8")
-        replace_len = len(replace_object)
-        sql_content = self.sql_text.GetValue().encode('utf-8')
-        sql_len = len(sql_content)
-        direction = self.direction_box.GetSelection()
-        if direction == 0:
-            curr_pos = curr_pos - find_len
-            max_pos = 0
-        else:
-            max_pos = sql_len
-        curr_pos = self.sql_text.FindText(curr_pos, max_pos, find_object, flags)
-        if curr_pos == -1 and direction == 1:
-            curr_pos = self.sql_text.FindText(0, sql_len, find_object, flags)
-        elif curr_pos == -1 and direction == 0:
-            curr_pos = self.sql_text.FindText(sql_len, 0, find_object, flags)
-        if curr_pos != -1:
-            self.sql_text.SetValue(sql_content[:curr_pos] + replace_object + sql_content[curr_pos + find_len:])
-            self.sql_text.SetSelection(curr_pos, curr_pos + replace_len)
-        self.sql_text.MoveCaretInsideView()
-
-    def dlg_close(self, event):
-        self.find_replace_dlg.EndModal(wx.ID_OK)
-
     # 按钮样式
     def button_enter(self, event):
         self.button.SetBackgroundColour("#338BB8")
@@ -355,6 +174,257 @@ class SqlFormat(wx.Frame):
     def button_leave(self, event):
         self.button.SetBackgroundColour(self.button_bc)
         self.button.SetForegroundColour(self.button_fc)
+
+
+class SqlFormat(wx.Frame):
+    def __init__(self):
+        super(SqlFormat, self).__init__(None, title='SQL格式助手', size=(640, 480), style=wx.DEFAULT_FRAME_STYLE)
+        self.SetIcon(wx.Icon('sql_format.ico'))
+        self.SetBackgroundColour("#FFFFFF")
+        self.Center()
+
+        self.menu_bar = wx.MenuBar()
+        # 菜单栏-文件
+        self.file_menu = wx.Menu()
+        self.new_menu = wx.MenuItem(self.file_menu, 11, u"新建", kind=wx.ITEM_NORMAL)
+        self.save_menu = wx.MenuItem(self.file_menu, 12, u"保存", kind=wx.ITEM_NORMAL)
+        self.delete_menu = wx.MenuItem(self.file_menu, 13, u"删除", kind=wx.ITEM_NORMAL)
+        self.search_menu = wx.MenuItem(self.file_menu, 14, u"查找||替换\tCtrl+F", kind=wx.ITEM_NORMAL)
+        self.file_menu.Append(self.new_menu)
+        self.file_menu.Append(self.save_menu)
+        self.file_menu.Append(self.delete_menu)
+        self.file_menu.AppendSeparator()
+        self.file_menu.Append(self.search_menu)
+
+        # 菜单栏-设置
+        self.set_menu = wx.Menu()
+        self.font_menu = wx.MenuItem(self.set_menu, 21, "字体", kind=wx.ITEM_NORMAL)
+        self.comma_menu = wx.MenuItem(self.set_menu, 22, "逗号前置", kind=wx.ITEM_CHECK)
+        self.table_menu = wx.MenuItem(self.set_menu, 23, "输出表名", kind=wx.ITEM_CHECK)
+        # 后续考虑改成输入框，用户自定义关键词后续的空格个数
+        self.space_menu = wx.MenuItem(self.set_menu, 24, "单空格", kind=wx.ITEM_CHECK)
+        self.set_menu.Append(self.font_menu)
+        self.set_menu.AppendSeparator()
+        self.set_menu.Append(self.comma_menu)
+        self.set_menu.Append(self.table_menu)
+        self.set_menu.Append(self.space_menu)
+
+        # 菜单栏-显示
+        self.show_menu = wx.Menu()
+        self.show_space_menu = wx.MenuItem(self.set_menu, 31, "显示空格", kind=wx.ITEM_CHECK)
+        self.wrap_menu = wx.MenuItem(self.set_menu, 32, "自动换行", kind=wx.ITEM_CHECK)
+        self.kw_tip_menu = wx.MenuItem(self.set_menu, 33, "关键词提示", kind=wx.ITEM_CHECK)
+        self.show_menu.Append(self.show_space_menu)
+        self.show_menu.Append(self.wrap_menu)
+        self.show_menu.AppendSeparator()
+        self.show_menu.Append(self.kw_tip_menu)
+
+        self.menu_bar.Append(self.file_menu, title="文件")
+        self.menu_bar.Append(self.set_menu, title="设置")
+        self.menu_bar.Append(self.show_menu, title="显示")
+        self.SetMenuBar(self.menu_bar)
+
+        # 菜单动作
+        self.file_menu.Bind(wx.EVT_MENU, self.menu_event)
+        self.set_menu.Bind(wx.EVT_MENU, self.menu_event)
+        self.show_menu.Bind(wx.EVT_MENU, self.menu_event)
+
+        # 查找&替换对话框 --查找/替换，向上/向下，区分大小写
+        self.find_replace_dialog = wx.Dialog(self, title='查找&替换', size=(400, 180),
+                                             style=wx.DEFAULT_DIALOG_STYLE)
+        self.find_replace_dialog.Position = (self.Position[0] + self.Size[0] / 2 - self.find_replace_dialog.Size[0] / 2,
+                                             self.Position[1] + self.Size[1] / 2 - self.find_replace_dialog.Size[1] / 2)
+        self.find_replace_dialog_panel = wx.Panel(self.find_replace_dialog)
+        self.find_lable = wx.StaticText(parent=self.find_replace_dialog_panel, label='查找内容:')
+        self.find_text = wx.TextCtrl(parent=self.find_replace_dialog_panel)
+        self.find_button = wx.Button(parent=self.find_replace_dialog_panel, label='查找')
+        self.replace_lable = wx.StaticText(parent=self.find_replace_dialog_panel, label='替换内容:')
+        self.replace_text = wx.TextCtrl(parent=self.find_replace_dialog_panel)
+        self.replace_button = wx.Button(parent=self.find_replace_dialog_panel, label='替换')
+        self.direction_box = wx.RadioBox(parent=self.find_replace_dialog_panel, label='方向', choices=['向上', '向下'],
+                                         style=wx.RA_SPECIFY_COLS)
+        self.direction_box.SetSelection(1)
+        self.case_sensitive_box = wx.CheckBox(parent=self.find_replace_dialog_panel, label='区分大小写')
+
+        # 查找&替换对话框布局
+        self.find_replace_dialog_vbox1 = wx.BoxSizer()
+        self.find_replace_dialog_vbox1.Add(self.find_lable, proportion=0, flag=wx.ALL | wx.ALIGN_CENTER, border=5)
+        self.find_replace_dialog_vbox1.Add(self.find_text, proportion=1, flag=wx.ALIGN_CENTER | wx.RIGHT, border=5)
+        self.find_replace_dialog_vbox1.Add(self.find_button, proportion=0, flag=wx.ALIGN_CENTER | wx.LEFT, border=5)
+        self.find_replace_dialog_vbox2 = wx.BoxSizer()
+        self.find_replace_dialog_vbox2.Add(self.replace_lable, proportion=0, flag=wx.ALL | wx.ALIGN_CENTER, border=5)
+        self.find_replace_dialog_vbox2.Add(self.replace_text, proportion=1, flag=wx.ALIGN_CENTER | wx.RIGHT, border=5)
+        self.find_replace_dialog_vbox2.Add(self.replace_button, proportion=0, flag=wx.ALIGN_CENTER | wx.LEFT, border=5)
+        self.direction_vbox = wx.BoxSizer()
+        self.direction_vbox.Add(self.direction_box)
+        self.case_sensitive_vbox = wx.BoxSizer()
+        self.case_sensitive_vbox.Add(self.case_sensitive_box)
+        self.find_replace_dialog_vbox3 = wx.BoxSizer()
+        self.find_replace_dialog_vbox3.Add(self.direction_vbox, proportion=1, flag=wx.ALL | wx.ALIGN_CENTER, border=5)
+        self.find_replace_dialog_vbox3.Add(self.case_sensitive_vbox, proportion=0, flag=wx.ALL | wx.ALIGN_CENTER,
+                                           border=5)
+        self.find_replace_dialog_hbox = wx.BoxSizer(wx.VERTICAL)
+        self.find_replace_dialog_hbox.Add(self.find_replace_dialog_vbox1, flag=wx.TOP | wx.EXPAND, border=5)
+        self.find_replace_dialog_hbox.Add(self.find_replace_dialog_vbox2, flag=wx.TOP | wx.EXPAND, border=5)
+        self.find_replace_dialog_hbox.Add(self.find_replace_dialog_vbox3, flag=wx.TOP | wx.EXPAND, border=5)
+        self.find_replace_dialog_panel.SetSizer(self.find_replace_dialog_hbox)
+        # 查找&替换对话框动作
+        self.find_button.Bind(wx.EVT_BUTTON, self.find)
+        self.replace_button.Bind(wx.EVT_BUTTON, self.replace)
+
+        # 快捷键
+        keyboard_cf = wx.AcceleratorTable([(wx.ACCEL_CTRL, ord('f'), self.search_menu.GetId())])
+        self.SetAcceleratorTable(keyboard_cf)
+        keyboard_cs = wx.AcceleratorTable([(wx.ACCEL_CTRL, ord('s'), self.save_menu.GetId())])
+        self.SetAcceleratorTable(keyboard_cs)
+
+        # 读取预设变量
+        self.set_info = configparser.ConfigParser()
+        if os.path.exists('set_info.ini'):
+            self.set_info.read('set_info.ini')
+            set_data = dict(self.set_info.items('set_info'))
+            self.comma_menu.Check(int(set_data['comma']))
+            self.table_menu.Check(int(set_data['table']))
+            self.space_menu.Check(int(set_data['space']))
+            self.show_space_menu.Check(int(set_data['show_space']))
+            self.wrap_menu.Check(int(set_data['wrap']))
+            self.kw_tip_menu.Check(int(set_data['kw_tip']))
+        else:
+            self.set_info.add_section('set_info')
+
+        # 页卡
+        self.sf_notebook = wx.Notebook(self, style=wx.NB_NOPAGETHEME)
+        self.sf_panel1 = SqlFormatPanel(self.sf_notebook, self.comma_menu, self.table_menu, self.space_menu,
+                                        self.show_space_menu, self.wrap_menu, self.kw_tip_menu)
+        self.sf_notebook.AddPage(self.sf_panel1, 'new 1')
+        self.notebook_list = [1]
+
+        # 页卡动作
+        self.sf_notebook.Bind(wx.EVT_NOTEBOOK_PAGE_CHANGED, self.notebook_update)
+
+        self.Show()
+
+    # 菜单栏配置
+    def menu_event(self, event):
+        sf_panel = self.sf_notebook.GetCurrentPage()
+        event_id = event.GetId()
+        if event_id == 11:
+            self.sf_notebook.ChangeSelection(self.notebook_new())
+        elif event_id == 12:
+            self.notebook_save()
+        elif event_id == 13:
+            self.notebook_delete()
+        elif event_id == 14:
+            self.find_replace_dialog.Show()
+        elif event_id == 21:
+            font_dlg = wx.FontDialog()
+            if font_dlg.ShowModal() == wx.ID_OK:
+                data = font_dlg.GetFontData()
+                sf_panel.sql_text.StyleSetFont(stc.STC_SQL_IDENTIFIER, data.GetChosenFont())
+            font_dlg.Destroy()
+        elif event_id == 31:
+            sf_panel.sql_text.SetViewWhiteSpace(self.show_space_menu.IsChecked())
+        elif event_id == 32:
+            sf_panel.sql_text.SetWrapMode(self.wrap_menu.IsChecked())
+        self.set_info.set('set_info', 'comma', str(int(self.comma_menu.IsChecked())))
+        self.set_info.set('set_info', 'table', str(int(self.table_menu.IsChecked())))
+        self.set_info.set('set_info', 'space', str(int(self.space_menu.IsChecked())))
+        self.set_info.set('set_info', 'show_space', str(int(self.show_space_menu.IsChecked())))
+        self.set_info.set('set_info', 'wrap', str(int(self.wrap_menu.IsChecked())))
+        self.set_info.set('set_info', 'kw_tip', str(int(self.kw_tip_menu.IsChecked())))
+        self.set_info.write(open('set_info.ini', 'w+', encoding="utf-8"))
+
+    def notebook_update(self, event):
+        sf_panel = self.sf_notebook.GetCurrentPage()
+        sf_panel.sql_text.SetViewWhiteSpace(self.show_space_menu.IsChecked())
+        sf_panel.sql_text.SetWrapMode(self.wrap_menu.IsChecked())
+
+    def notebook_new(self):
+        self.notebook_list.append(self.notebook_list[-1] + 1)
+        sf_panel = SqlFormatPanel(self.sf_notebook, self.comma_menu, self.table_menu, self.space_menu,
+                                  self.show_space_menu, self.wrap_menu, self.kw_tip_menu)
+        self.sf_notebook.AddPage(sf_panel, 'new {0}'.format(self.notebook_list[-1]))
+        return len(self.notebook_list) - 1
+
+    def notebook_delete(self):
+        curr_page_num = self.sf_notebook.GetSelection()
+        self.notebook_list.pop(curr_page_num)
+        self.sf_notebook.DeletePage(curr_page_num)
+
+    def notebook_save(self):
+        curr_page_num = self.sf_notebook.GetSelection()
+        curr_page_name = self.sf_notebook.GetPageText(curr_page_num)
+        file_save_dialog = wx.FileDialog(self, message="保存", defaultDir=os.getcwd(), wildcard='.sql', size=(428, 266),
+                                         style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT, defaultFile=curr_page_name)
+        file_save_dialog.Position = (self.Position[0] + self.Size[0] / 2 - file_save_dialog.Size[0] / 2,
+                                     self.Position[1] + self.Size[1] / 2 - file_save_dialog.Size[1] / 2)
+        sf_panel = self.sf_notebook.GetCurrentPage()
+        sql_text = sf_panel.sql_text.GetValue()
+        # print(sql_text)
+        if file_save_dialog.ShowModal() == wx.ID_OK:
+            filename = file_save_dialog.GetPath()
+            save_file = open(filename, 'w')
+            save_file.write(sql_text)
+            save_file.close()
+            self.sf_notebook.SetPageText(curr_page_num, file_save_dialog.Filename)
+        file_save_dialog.Destroy()
+
+    def find(self, event):
+        sf_panel = self.sf_notebook.GetCurrentPage()
+        if self.case_sensitive_box.IsChecked():
+            flags = 5
+        else:
+            flags = 0
+        curr_pos = sf_panel.sql_text.GetCurrentPos()
+        sf_panel.sql_text.SetSelection(curr_pos, curr_pos)
+        find_object = self.find_text.GetValue().encode("utf-8")
+        find_len = len(find_object)
+        sql_content = sf_panel.sql_text.GetValue().encode('utf-8')
+        sql_len = len(sql_content)
+        direction = self.direction_box.GetSelection()
+        if direction == 0:
+            curr_pos = curr_pos - find_len
+            max_pos = 0
+        else:
+            max_pos = sql_len
+        curr_pos = sf_panel.sql_text.FindText(curr_pos, max_pos, find_object, flags)
+        if curr_pos == -1 and direction == 1:
+            curr_pos = sf_panel.sql_text.FindText(0, sql_len, find_object, flags)
+        elif curr_pos == -1 and direction == 0:
+            curr_pos = sf_panel.sql_text.FindText(sql_len, 0, find_object, flags)
+        if curr_pos != -1:
+            sf_panel.sql_text.SetSelection(curr_pos, curr_pos + find_len)
+        sf_panel.sql_text.MoveCaretInsideView()
+
+    def replace(self, event):
+        sf_panel = self.sf_notebook.GetCurrentPage()
+        if self.case_sensitive_box.IsChecked():
+            flags = 5
+        else:
+            flags = 0
+        curr_pos = sf_panel.sql_text.GetCurrentPos()
+        sf_panel.sql_text.SetSelection(curr_pos, curr_pos)
+        find_object = self.find_text.GetValue().encode("utf-8")
+        find_len = len(find_object)
+        replace_object = self.replace_text.GetValue().encode("utf-8")
+        replace_len = len(replace_object)
+        sql_content = sf_panel.sql_text.GetValue().encode('utf-8')
+        sql_len = len(sql_content)
+        direction = self.direction_box.GetSelection()
+        if direction == 0:
+            curr_pos = curr_pos - find_len
+            max_pos = 0
+        else:
+            max_pos = sql_len
+        curr_pos = sf_panel.sql_text.FindText(curr_pos, max_pos, find_object, flags)
+        if curr_pos == -1 and direction == 1:
+            curr_pos = sf_panel.sql_text.FindText(0, sql_len, find_object, flags)
+        elif curr_pos == -1 and direction == 0:
+            curr_pos = sf_panel.sql_text.FindText(sql_len, 0, find_object, flags)
+        if curr_pos != -1:
+            sf_panel.sql_text.SetValue(sql_content[:curr_pos] + replace_object + sql_content[curr_pos + find_len:])
+            sf_panel.sql_text.SetSelection(curr_pos, curr_pos + replace_len)
+        sf_panel.sql_text.MoveCaretInsideView()
 
 
 if __name__ == '__main__':
