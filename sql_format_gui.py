@@ -68,6 +68,7 @@ class SqlFormatPanel(wx.Panel):
         # 文本动作
         self.sql_text.Bind(stc.EVT_STC_UPDATEUI, self.highlight)
         self.sql_text.Bind(wx.EVT_KEY_UP, self.keyword_tip)
+        self.sql_text.Bind(wx.EVT_SET_CURSOR, self.get_pos)
 
         # 按钮控件
         self.button = wx.Button(self, label="格式化", style=wx.Center)
@@ -80,11 +81,31 @@ class SqlFormatPanel(wx.Panel):
         self.button.Bind(wx.EVT_LEAVE_WINDOW, self.button_leave)
         self.button.Bind(wx.EVT_BUTTON, self.exec_format)
 
+        # 位置信息
+        self.pos_label = wx.StaticText(self, style=wx.ALIGN_RIGHT)
+
         # 布局
         self.v_box = wx.BoxSizer(wx.VERTICAL)
         self.v_box.Add(self.sql_text, proportion=1, flag=wx.EXPAND)
-        self.v_box.Add(self.button, proportion=0, flag=wx.ALIGN_CENTER | wx.ALL, border=5)
+        self.v_box.Add(self.button, proportion=0, flag=wx.ALIGN_CENTER)
         self.SetSizer(self.v_box)
+
+    def get_pos(self, event):
+        line_num = self.sql_text.GetCurrentLine()
+        select_text = self.sql_text.GetSelectedText()
+        if len(select_text) > 0:
+            select_info = '{0}chars  '.format(len(select_text))
+            if select_text.count('\n') > 0:
+                select_info = '{0}lines '.format(select_text.count('\n')) + select_info
+        else:
+            select_info = ''
+        self.pos_label.SetLabel('{0}{1}:{2}'.format(
+            select_info,
+            self.sql_text.GetCurrentLine() + 1,
+            self.sql_text.GetCurrentPos() - self.sql_text.GetLineEndPosition(line_num - 1)))
+        self.pos_label.Position = (
+            self.sql_text.GetPosition()[0] + self.sql_text.GetSize()[0] - self.pos_label.GetSize()[0],
+            self.button.GetPosition()[1] + self.button.GetSize()[1] - self.pos_label.GetSize()[1])
 
     # 文本高亮
     def highlight(self, event):
@@ -187,12 +208,14 @@ class SqlFormat(wx.Frame):
         # 菜单栏-文件
         self.file_menu = wx.Menu()
         self.new_menu = wx.MenuItem(self.file_menu, 11, u"新建", kind=wx.ITEM_NORMAL)
-        self.save_menu = wx.MenuItem(self.file_menu, 12, u"保存", kind=wx.ITEM_NORMAL)
-        self.delete_menu = wx.MenuItem(self.file_menu, 13, u"删除", kind=wx.ITEM_NORMAL)
-        self.search_menu = wx.MenuItem(self.file_menu, 14, u"查找||替换\tCtrl+F", kind=wx.ITEM_NORMAL)
+        self.open_menu = wx.MenuItem(self.file_menu, 12, u"打开(0)", kind=wx.ITEM_NORMAL)
+        self.save_menu = wx.MenuItem(self.file_menu, 13, u"保存(S)", kind=wx.ITEM_NORMAL)
+        self.close_menu = wx.MenuItem(self.file_menu, 14, u"关闭", kind=wx.ITEM_NORMAL)
+        self.search_menu = wx.MenuItem(self.file_menu, 19, u"查找&替换(F)", kind=wx.ITEM_NORMAL)
         self.file_menu.Append(self.new_menu)
+        self.file_menu.Append(self.open_menu)
         self.file_menu.Append(self.save_menu)
-        self.file_menu.Append(self.delete_menu)
+        self.file_menu.Append(self.close_menu)
         self.file_menu.AppendSeparator()
         self.file_menu.Append(self.search_menu)
 
@@ -218,7 +241,6 @@ class SqlFormat(wx.Frame):
         self.show_menu.Append(self.wrap_menu)
         self.show_menu.AppendSeparator()
         self.show_menu.Append(self.kw_tip_menu)
-
         self.menu_bar.Append(self.file_menu, title="文件")
         self.menu_bar.Append(self.set_menu, title="设置")
         self.menu_bar.Append(self.show_menu, title="显示")
@@ -273,10 +295,10 @@ class SqlFormat(wx.Frame):
         self.replace_button.Bind(wx.EVT_BUTTON, self.replace)
 
         # 快捷键
-        keyboard_cf = wx.AcceleratorTable([(wx.ACCEL_CTRL, ord('f'), self.search_menu.GetId())])
-        self.SetAcceleratorTable(keyboard_cf)
-        keyboard_cs = wx.AcceleratorTable([(wx.ACCEL_CTRL, ord('s'), self.save_menu.GetId())])
-        self.SetAcceleratorTable(keyboard_cs)
+        keyboard = wx.AcceleratorTable([(wx.ACCEL_CTRL, ord('f'), self.search_menu.GetId()),
+                                        (wx.ACCEL_CTRL, ord('s'), self.save_menu.GetId()),
+                                        (wx.ACCEL_CTRL, ord('o'), self.open_menu.GetId())])
+        self.SetAcceleratorTable(keyboard)
 
         # 读取预设变量
         self.set_info = configparser.ConfigParser()
@@ -298,7 +320,6 @@ class SqlFormat(wx.Frame):
                                         self.show_space_menu, self.wrap_menu, self.kw_tip_menu)
         self.sf_notebook.AddPage(self.sf_panel1, 'new 1')
         self.notebook_list = [1]
-
         # 页卡动作
         self.sf_notebook.Bind(wx.EVT_NOTEBOOK_PAGE_CHANGED, self.notebook_update)
 
@@ -308,23 +329,25 @@ class SqlFormat(wx.Frame):
     def menu_event(self, event):
         sf_panel = self.sf_notebook.GetCurrentPage()
         event_id = event.GetId()
-        if event_id == 11:
+        if event_id == self.new_menu.GetId():
             self.sf_notebook.ChangeSelection(self.notebook_new())
-        elif event_id == 12:
+        elif event_id == self.open_menu.GetId():
+            self.sf_notebook.ChangeSelection(self.notebook_open())
+        elif event_id == self.save_menu.GetId():
             self.notebook_save()
-        elif event_id == 13:
-            self.notebook_delete()
-        elif event_id == 14:
+        elif event_id == self.close_menu.GetId():
+            self.notebook_close()
+        elif event_id == self.search_menu.GetId():
             self.find_replace_dialog.Show()
-        elif event_id == 21:
+        elif event_id == self.font_menu.GetId():
             font_dlg = wx.FontDialog()
             if font_dlg.ShowModal() == wx.ID_OK:
                 data = font_dlg.GetFontData()
                 sf_panel.sql_text.StyleSetFont(stc.STC_SQL_IDENTIFIER, data.GetChosenFont())
             font_dlg.Destroy()
-        elif event_id == 31:
+        elif event_id == self.show_space_menu.GetId():
             sf_panel.sql_text.SetViewWhiteSpace(self.show_space_menu.IsChecked())
-        elif event_id == 32:
+        elif event_id == self.wrap_menu.GetId():
             sf_panel.sql_text.SetWrapMode(self.wrap_menu.IsChecked())
         self.set_info.set('set_info', 'comma', str(int(self.comma_menu.IsChecked())))
         self.set_info.set('set_info', 'table', str(int(self.table_menu.IsChecked())))
@@ -346,7 +369,25 @@ class SqlFormat(wx.Frame):
         self.sf_notebook.AddPage(sf_panel, 'new {0}'.format(self.notebook_list[-1]))
         return len(self.notebook_list) - 1
 
-    def notebook_delete(self):
+    def notebook_open(self):
+        file_open_dialog = wx.FileDialog(self, message="打开", defaultDir=os.getcwd(), wildcard='*.sql',
+                                         size=(428, 266), style=wx.FD_OPEN | wx.FD_CHANGE_DIR)
+        file_open_dialog.Position = (self.Position[0] + self.Size[0] / 2 - file_open_dialog.Size[0] / 2,
+                                     self.Position[1] + self.Size[1] / 2 - file_open_dialog.Size[1] / 2)
+        if file_open_dialog.ShowModal() == wx.ID_OK:
+            filename = file_open_dialog.GetPath()
+            save_file = open(filename, 'rb')
+            sql = save_file.read()
+            save_file.close()
+            sf_panel = SqlFormatPanel(self.sf_notebook, self.comma_menu, self.table_menu, self.space_menu,
+                                      self.show_space_menu, self.wrap_menu, self.kw_tip_menu)
+            sf_panel.sql_text.SetValue(sql)
+            self.sf_notebook.AddPage(sf_panel, '{0}'.format(file_open_dialog.Filename))
+            self.notebook_list.append(self.notebook_list[-1] + 1)
+        file_open_dialog.Destroy()
+        return len(self.notebook_list) - 1
+
+    def notebook_close(self):
         curr_page_num = self.sf_notebook.GetSelection()
         self.notebook_list.pop(curr_page_num)
         self.sf_notebook.DeletePage(curr_page_num)
@@ -354,8 +395,9 @@ class SqlFormat(wx.Frame):
     def notebook_save(self):
         curr_page_num = self.sf_notebook.GetSelection()
         curr_page_name = self.sf_notebook.GetPageText(curr_page_num)
-        file_save_dialog = wx.FileDialog(self, message="保存", defaultDir=os.getcwd(), wildcard='.sql', size=(428, 266),
-                                         style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT, defaultFile=curr_page_name)
+        file_save_dialog = wx.FileDialog(self, message="保存", defaultDir=os.getcwd(), wildcard='*.sql', size=(428, 266),
+                                         style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT | wx.FD_CHANGE_DIR,
+                                         defaultFile=curr_page_name)
         file_save_dialog.Position = (self.Position[0] + self.Size[0] / 2 - file_save_dialog.Size[0] / 2,
                                      self.Position[1] + self.Size[1] / 2 - file_save_dialog.Size[1] / 2)
         sf_panel = self.sf_notebook.GetCurrentPage()
