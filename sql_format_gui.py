@@ -6,7 +6,7 @@ import sql_format_exec
 import re
 import os
 import configparser
-import time
+import math
 
 
 class SqlFormatPanel(wx.Panel):
@@ -90,7 +90,13 @@ class SqlFormatPanel(wx.Panel):
         self.v_box.Add(self.button, proportion=0, flag=wx.ALIGN_CENTER)
         self.SetSizer(self.v_box)
 
+    # 光标位置/调整行数宽度
     def get_pos(self, event):
+        max_line = self.sql_text.GetLineCount()
+        if max_line > 999:
+            self.sql_text.SetMarginWidth(1, int(math.log10(max_line)) * 10 + 5)
+        else:
+            self.sql_text.SetMarginWidth(1, 25)
         line_num = self.sql_text.GetCurrentLine()
         select_text = self.sql_text.GetSelectedText()
         if len(select_text) > 0:
@@ -253,7 +259,7 @@ class SqlFormat(wx.Frame):
 
         # 查找&替换对话框 --查找/替换，向上/向下，区分大小写
         self.find_replace_dialog = wx.Dialog(self, title='查找&替换', size=(400, 180),
-                                             style=wx.DEFAULT_DIALOG_STYLE)
+                                             style=wx.DEFAULT_DIALOG_STYLE | wx.STAY_ON_TOP)
         self.find_replace_dialog.Position = (self.Position[0] + self.Size[0] / 2 - self.find_replace_dialog.Size[0] / 2,
                                              self.Position[1] + self.Size[1] / 2 - self.find_replace_dialog.Size[1] / 2)
         self.find_replace_dialog_panel = wx.Panel(self.find_replace_dialog)
@@ -430,13 +436,15 @@ class SqlFormat(wx.Frame):
         else:
             max_pos = sql_len
         curr_pos = sf_panel.sql_text.FindText(curr_pos, max_pos, find_object, flags)
+        print(curr_pos)
         if curr_pos == -1 and direction == 1:
             curr_pos = sf_panel.sql_text.FindText(0, sql_len, find_object, flags)
         elif curr_pos == -1 and direction == 0:
             curr_pos = sf_panel.sql_text.FindText(sql_len, 0, find_object, flags)
+        sf_panel.sql_text.SetCurrentPos(curr_pos)
+        sf_panel.sql_text.ScrollToLine(sf_panel.sql_text.GetCurrentLine())
         if curr_pos != -1:
             sf_panel.sql_text.SetSelection(curr_pos, curr_pos + find_len)
-        sf_panel.sql_text.MoveCaretInsideView()
 
     def replace(self, event):
         sf_panel = self.sf_notebook.GetCurrentPage()
@@ -463,10 +471,11 @@ class SqlFormat(wx.Frame):
             curr_pos = sf_panel.sql_text.FindText(0, sql_len, find_object, flags)
         elif curr_pos == -1 and direction == 0:
             curr_pos = sf_panel.sql_text.FindText(sql_len, 0, find_object, flags)
+        sf_panel.sql_text.SetCurrentPos(curr_pos)
+        sf_panel.sql_text.ScrollToLine(sf_panel.sql_text.GetCurrentLine())
         if curr_pos != -1:
             sf_panel.sql_text.SetValue(sql_content[:curr_pos] + replace_object + sql_content[curr_pos + find_len:])
             sf_panel.sql_text.SetSelection(curr_pos, curr_pos + replace_len)
-        sf_panel.sql_text.MoveCaretInsideView()
 
 
 if __name__ == '__main__':
