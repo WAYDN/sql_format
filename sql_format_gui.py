@@ -10,6 +10,7 @@ import math
 
 
 class SqlFormatPanel(wx.Panel):
+    """页卡功能"""
     def __init__(self, parent, comma_menu, table_menu, space_menu, show_space_menu, wrap_menu, kw_tip_menu):
         super(SqlFormatPanel, self).__init__(parent)
         self.SetBackgroundColour('#F5F5F5')
@@ -204,6 +205,7 @@ class SqlFormatPanel(wx.Panel):
 
 
 class SqlFormat(wx.Frame):
+    """主体(菜单栏+页卡+执行按钮)"""
     def __init__(self):
         super(SqlFormat, self).__init__(None, title='SQL格式助手', size=(640, 480), style=wx.DEFAULT_FRAME_STYLE)
         self.SetIcon(wx.Icon('sql_format.ico'))

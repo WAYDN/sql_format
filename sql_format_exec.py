@@ -29,7 +29,7 @@ def sql_split(sql, is_comma_trans=False, space_num=2):
     """
     # 分割sql, 结尾加\s 防止将非关键字给分割了 例如pdw_fact_person_insure中的on
     # 20190326 wq 在关键字前后增加\s，防止将非关键字给分割了，例如sql_from中的from
-    if re.search(r'create.*(?!=select)', sql):
+    if re.search(r'create\s.*(?!=select)', sql):
         split_sql = re.findall(r'((create|partitioned|clustered|sorted by|stored as|into|row format|location)'
                                r'.*?'
                                r'\s(?=(create|partitioned|clustered|sorted by|stored as|into|row format|location)|$))',
@@ -72,7 +72,7 @@ def sql_split(sql, is_comma_trans=False, space_num=2):
         for exec_sql_pos in range(len(exec_sql)):
             exec_sql_value = exec_sql[exec_sql_pos].strip()
             first_value = re.match(r'\s*(--|\w+|\))\s?', exec_sql_value).group(1)
-            if first_value in ('select', 'group', 'order') or re.search(r'^create.*(?!=select)', exec_sql_value):
+            if first_value in ('select', 'group', 'order') or re.search(r'^create\s.*(?!=select)', exec_sql_value):
                 # 分割字段，根据','分割出所有字段
                 tmp_sql = [i[0].strip() for i in re.findall(r'(.*?(,(\s*--\s*[^\s]*)?|$))', exec_sql_value)
                            if i[0].strip() != '']
@@ -265,7 +265,7 @@ def sql_format(sql, is_comma_trans=False, space_num=2):
                     continue
                 tmp_result_sql = tmp_result_sql + level * 8 * " " + split_sql_value + "\r\n"
                 # 按括号添加前缀空格，create跳过添加前缀空格
-                if re.search(r'create.*(?!=select)', tmp_sql_value):
+                if re.search(r'^(\W*)create.*(?!=select)', tmp_sql_value):
                     pass
                 elif re.search(r'\((\s*--\s*[^\s]*)?\s*$', split_sql_value):
                     level += 1
@@ -306,9 +306,10 @@ if __name__ == '__main__':
     original_sql = [
         """
         with asss as (
-        select 123),
+        select 123 as create_time),
+        ssd as (select -123),
         dds as ( --fesfa
-        select -123),da as (select 321) --123
+        select 3212 as time_union),da as (select 312 as insert_time) --123
 select 1+1, -1-2, 1*-2 , +   +1 regexp_extract(map_col, 'from_sign_id":"([^2]+)"', 1) [1], case when 
 coalesce(from_object, '') not in ('icon', '') then -12+-25 else -123*-2 end as from_content, count(1) 
 from pdw.fact_stock_em_web_log 
@@ -327,8 +328,8 @@ update_time string
   row format delimited fields terminated by '\t' stored as PARQUET TBLPROPERTIES('parquet.compression'='SNAPPY')""",
         """create table db_test.wq_test as select 123 as ddd, 321 as ds"""
     ]
-    for exec_sql_vaule in [original_sql[1]]:
-        # print(exec_sql_vaule)
-        # print("------------------------无情分割线-----------------------")
+    for exec_sql_vaule in [original_sql[0]]:
+        print(exec_sql_vaule)
+        print("------------------------无情分割线-----------------------")
         format_sql = sql_format(exec_sql_vaule, False, 2)
         print(format_sql[0])
