@@ -7,6 +7,7 @@ import re
 import os
 import configparser
 import math
+import wx.grid as wg
 
 
 class SqlFormatPanel(wx.Panel):
@@ -242,65 +243,155 @@ class SqlFormat(wx.Frame):
 
         # 菜单栏-显示
         self.show_menu = wx.Menu()
-        self.show_space_menu = wx.MenuItem(self.set_menu, 31, "显示空格", kind=wx.ITEM_CHECK)
-        self.wrap_menu = wx.MenuItem(self.set_menu, 32, "自动换行", kind=wx.ITEM_CHECK)
-        self.kw_tip_menu = wx.MenuItem(self.set_menu, 33, "关键词提示", kind=wx.ITEM_CHECK)
+        self.show_space_menu = wx.MenuItem(self.show_menu, 31, "显示空格", kind=wx.ITEM_CHECK)
+        self.wrap_menu = wx.MenuItem(self.show_menu, 32, "自动换行", kind=wx.ITEM_CHECK)
+        self.kw_tip_menu = wx.MenuItem(self.show_menu, 33, "关键词提示", kind=wx.ITEM_CHECK)
         self.show_menu.Append(self.show_space_menu)
         self.show_menu.Append(self.wrap_menu)
         self.show_menu.AppendSeparator()
         self.show_menu.Append(self.kw_tip_menu)
+
+        # 菜单栏-建表
+        self.create_table_menu = wx.Menu()
+        self.hive_menu = wx.MenuItem(self.create_table_menu, 41, "Hive", kind=wx.ITEM_NORMAL)
+        self.create_table_menu.Append(self.hive_menu)
+
+        # 菜单栏
         self.menu_bar.Append(self.file_menu, title="文件")
         self.menu_bar.Append(self.set_menu, title="设置")
         self.menu_bar.Append(self.show_menu, title="显示")
+        self.menu_bar.Append(self.create_table_menu, title="建表")
         self.SetMenuBar(self.menu_bar)
 
         # 菜单动作
         self.file_menu.Bind(wx.EVT_MENU, self.menu_event)
         self.set_menu.Bind(wx.EVT_MENU, self.menu_event)
         self.show_menu.Bind(wx.EVT_MENU, self.menu_event)
+        self.create_table_menu.Bind(wx.EVT_MENU, self.menu_event)
 
         # 查找&替换对话框 --查找/替换，向上/向下，区分大小写
-        self.find_replace_dialog = wx.Dialog(self, title='查找&替换', size=(400, 180),
-                                             style=wx.DEFAULT_DIALOG_STYLE | wx.STAY_ON_TOP)
-        self.find_replace_dialog.Position = (self.Position[0] + self.Size[0] / 2 - self.find_replace_dialog.Size[0] / 2,
-                                             self.Position[1] + self.Size[1] / 2 - self.find_replace_dialog.Size[1] / 2)
-        self.find_replace_dialog_panel = wx.Panel(self.find_replace_dialog)
-        self.find_lable = wx.StaticText(parent=self.find_replace_dialog_panel, label='查找内容:')
-        self.find_text = wx.TextCtrl(parent=self.find_replace_dialog_panel)
-        self.find_button = wx.Button(parent=self.find_replace_dialog_panel, label='查找')
-        self.replace_lable = wx.StaticText(parent=self.find_replace_dialog_panel, label='替换内容:')
-        self.replace_text = wx.TextCtrl(parent=self.find_replace_dialog_panel)
-        self.replace_button = wx.Button(parent=self.find_replace_dialog_panel, label='替换')
-        self.direction_box = wx.RadioBox(parent=self.find_replace_dialog_panel, label='方向', choices=['向上', '向下'],
+        self.search_dialog = wx.Dialog(self, title='查找&替换', size=(400, 180),
+                                       style=wx.DEFAULT_DIALOG_STYLE | wx.STAY_ON_TOP)
+        self.search_dialog.Position = (self.Position[0] + self.Size[0] / 2 - self.search_dialog.Size[0] / 2,
+                                       self.Position[1] + self.Size[1] / 2 - self.search_dialog.Size[1] / 2)
+        self.search_dialog_panel = wx.Panel(self.search_dialog)
+        self.find_lable = wx.StaticText(parent=self.search_dialog_panel, label='查找内容:')
+        self.find_text = wx.TextCtrl(parent=self.search_dialog_panel)
+        self.find_button = wx.Button(parent=self.search_dialog_panel, label='查找')
+        self.replace_lable = wx.StaticText(parent=self.search_dialog_panel, label='替换内容:')
+        self.replace_text = wx.TextCtrl(parent=self.search_dialog_panel)
+        self.replace_button = wx.Button(parent=self.search_dialog_panel, label='替换')
+        self.direction_box = wx.RadioBox(parent=self.search_dialog_panel, label='方向', choices=['向上', '向下'],
                                          style=wx.RA_SPECIFY_COLS)
         self.direction_box.SetSelection(1)
-        self.case_sensitive_box = wx.CheckBox(parent=self.find_replace_dialog_panel, label='区分大小写')
-
+        self.case_sensitive_box = wx.CheckBox(parent=self.search_dialog_panel, label='区分大小写')
         # 查找&替换对话框布局
-        self.find_replace_dialog_vbox1 = wx.BoxSizer()
-        self.find_replace_dialog_vbox1.Add(self.find_lable, proportion=0, flag=wx.ALL | wx.ALIGN_CENTER, border=5)
-        self.find_replace_dialog_vbox1.Add(self.find_text, proportion=1, flag=wx.ALIGN_CENTER | wx.RIGHT, border=5)
-        self.find_replace_dialog_vbox1.Add(self.find_button, proportion=0, flag=wx.ALIGN_CENTER | wx.LEFT, border=5)
-        self.find_replace_dialog_vbox2 = wx.BoxSizer()
-        self.find_replace_dialog_vbox2.Add(self.replace_lable, proportion=0, flag=wx.ALL | wx.ALIGN_CENTER, border=5)
-        self.find_replace_dialog_vbox2.Add(self.replace_text, proportion=1, flag=wx.ALIGN_CENTER | wx.RIGHT, border=5)
-        self.find_replace_dialog_vbox2.Add(self.replace_button, proportion=0, flag=wx.ALIGN_CENTER | wx.LEFT, border=5)
+        self.search_dialog_vbox1 = wx.BoxSizer()
+        self.search_dialog_vbox1.Add(self.find_lable, proportion=0, flag=wx.ALL | wx.ALIGN_CENTER, border=5)
+        self.search_dialog_vbox1.Add(self.find_text, proportion=1, flag=wx.ALIGN_CENTER | wx.RIGHT, border=5)
+        self.search_dialog_vbox1.Add(self.find_button, proportion=0, flag=wx.ALIGN_CENTER | wx.LEFT, border=5)
+        self.search_dialog_vbox2 = wx.BoxSizer()
+        self.search_dialog_vbox2.Add(self.replace_lable, proportion=0, flag=wx.ALL | wx.ALIGN_CENTER, border=5)
+        self.search_dialog_vbox2.Add(self.replace_text, proportion=1, flag=wx.ALIGN_CENTER | wx.RIGHT, border=5)
+        self.search_dialog_vbox2.Add(self.replace_button, proportion=0, flag=wx.ALIGN_CENTER | wx.LEFT, border=5)
         self.direction_vbox = wx.BoxSizer()
         self.direction_vbox.Add(self.direction_box)
         self.case_sensitive_vbox = wx.BoxSizer()
         self.case_sensitive_vbox.Add(self.case_sensitive_box)
-        self.find_replace_dialog_vbox3 = wx.BoxSizer()
-        self.find_replace_dialog_vbox3.Add(self.direction_vbox, proportion=1, flag=wx.ALL | wx.ALIGN_CENTER, border=5)
-        self.find_replace_dialog_vbox3.Add(self.case_sensitive_vbox, proportion=0, flag=wx.ALL | wx.ALIGN_CENTER,
-                                           border=5)
-        self.find_replace_dialog_hbox = wx.BoxSizer(wx.VERTICAL)
-        self.find_replace_dialog_hbox.Add(self.find_replace_dialog_vbox1, flag=wx.TOP | wx.EXPAND, border=5)
-        self.find_replace_dialog_hbox.Add(self.find_replace_dialog_vbox2, flag=wx.TOP | wx.EXPAND, border=5)
-        self.find_replace_dialog_hbox.Add(self.find_replace_dialog_vbox3, flag=wx.TOP | wx.EXPAND, border=5)
-        self.find_replace_dialog_panel.SetSizer(self.find_replace_dialog_hbox)
+        self.search_dialog_vbox3 = wx.BoxSizer()
+        self.search_dialog_vbox3.Add(self.direction_vbox, proportion=1, flag=wx.ALL | wx.ALIGN_CENTER, border=5)
+        self.search_dialog_vbox3.Add(self.case_sensitive_vbox, proportion=0, flag=wx.ALL | wx.ALIGN_CENTER, border=5)
+        self.search_dialog_hbox = wx.BoxSizer(wx.VERTICAL)
+        self.search_dialog_hbox.Add(self.search_dialog_vbox1, flag=wx.TOP | wx.EXPAND, border=5)
+        self.search_dialog_hbox.Add(self.search_dialog_vbox2, flag=wx.TOP | wx.EXPAND, border=5)
+        self.search_dialog_hbox.Add(self.search_dialog_vbox3, flag=wx.TOP | wx.EXPAND, border=5)
+        self.search_dialog_panel.SetSizer(self.search_dialog_hbox)
         # 查找&替换对话框动作
         self.find_button.Bind(wx.EVT_BUTTON, self.find)
         self.replace_button.Bind(wx.EVT_BUTTON, self.replace)
+
+        # 建表对话框  可变大小-wx.RESIZE_BORDER
+        self.create_table_dialog = wx.Dialog(self, size=(370, 450), style=wx.DEFAULT_DIALOG_STYLE | wx.STAY_ON_TOP)
+        self.create_table_dialog.Center()
+        self.create_table_dialog_panel = wx.Panel(self.create_table_dialog)
+        # 字段属性
+        self.column_grid = wg.Grid(self.create_table_dialog_panel)
+        # 滚动条显示：wx.SHOW_SB_DEFAULT
+        self.column_grid.ShowScrollbars(wx.SHOW_SB_NEVER, wx.SHOW_SB_NEVER)
+        self.column_grid.SetRowLabelSize(20)
+        self.column_grid.SetDefaultColSize((self.create_table_dialog.Size[0] - 50) / 4, False)
+        self.column_grid.DisableDragColSize()
+        self.column_grid.DisableDragRowSize()
+        self.column_grid.SetDefaultCellOverflow(False)
+        self.column_grid.ClearGrid()
+        self.column_grid.CreateGrid(9, 4)
+        self.column_grid.SetColLabelValue(0, '字段名')
+        self.column_grid.SetColLabelValue(1, '字段类型')
+        self.column_grid.SetColLabelValue(2, '注释')
+        self.column_grid.SetColLabelValue(3, '是否分区')
+        self.column_grid.SetColFormatBool(3)
+        # 表属性
+        self.table_name_lable = wx.StaticText(parent=self.create_table_dialog_panel, label='表名:', size=(65, 20))
+        self.table_comment_lable = wx.StaticText(parent=self.create_table_dialog_panel, label='注释:', size=(65, 20))
+        self.table_divide_lable = wx.StaticText(parent=self.create_table_dialog_panel, label='列分割依据:', size=(65, 20))
+        self.table_store_lable = wx.StaticText(parent=self.create_table_dialog_panel, label='数据格式:', size=(65, 20))
+        self.table_path_lable = wx.StaticText(parent=self.create_table_dialog_panel, label='hdfs路径:', size=(65, 20))
+        self.table_type_lable = wx.StaticText(parent=self.create_table_dialog_panel, label='表类型:', size=(65, 20))
+        self.table_name_text = wx.TextCtrl(parent=self.create_table_dialog_panel)
+        self.table_comment_text = wx.TextCtrl(parent=self.create_table_dialog_panel)
+        self.table_divide_text = wx.TextCtrl(parent=self.create_table_dialog_panel, value='\\t')
+        self.table_store_text = wx.ComboBox(parent=self.create_table_dialog_panel, value='TEXTFILE',
+                                            choices=['TEXTFILE', 'PARQUET', 'SEQUENCEFILE', 'RCFILE', 'ORC'])
+        self.table_path_text = wx.TextCtrl(parent=self.create_table_dialog_panel)
+        self.table_type_text = wx.ComboBox(parent=self.create_table_dialog_panel, value='内部表', choices=['内部表', '外部表'])
+        self.create_table_button = wx.Button(parent=self.create_table_dialog_panel, label='生成')
+        # 布局
+        self.table_name_box = wx.BoxSizer()
+        self.table_name_box.Add(self.table_name_lable, proportion=0, flag=wx.ALL, border=5)
+        self.table_name_box.Add(self.table_name_text, proportion=1)
+        self.table_comment_box = wx.BoxSizer()
+        self.table_comment_box.Add(self.table_comment_lable, proportion=0, flag=wx.ALL, border=5)
+        self.table_comment_box.Add(self.table_comment_text, proportion=1)
+        self.table_divide_box = wx.BoxSizer()
+        self.table_divide_box.Add(self.table_divide_lable, proportion=0, flag=wx.ALL, border=5)
+        self.table_divide_box.Add(self.table_divide_text, proportion=1)
+        self.table_store_box = wx.BoxSizer()
+        self.table_store_box.Add(self.table_store_lable, proportion=0, flag=wx.ALL, border=5)
+        self.table_store_box.Add(self.table_store_text, proportion=1)
+        self.table_path_box = wx.BoxSizer()
+        self.table_path_box.Add(self.table_path_lable, proportion=0, flag=wx.ALL, border=5)
+        self.table_path_box.Add(self.table_path_text, proportion=1)
+        self.table_type_box = wx.BoxSizer()
+        self.table_type_box.Add(self.table_type_lable, proportion=0, flag=wx.ALL, border=5)
+        self.table_type_box.Add(self.table_type_text, proportion=1)
+        self.table_type_box.Add(self.create_table_button, proportion=0, flag=wx.LEFT, border=5)
+        self.table_box = wx.BoxSizer(wx.VERTICAL)
+        self.table_box.Add(self.table_name_box, flag=wx.EXPAND)
+        self.table_box.Add(self.table_comment_box, flag=wx.EXPAND)
+        self.table_box.Add(self.table_divide_box, flag=wx.EXPAND)
+        self.table_box.Add(self.table_store_box, flag=wx.EXPAND)
+        self.table_box.Add(self.table_path_box, flag=wx.EXPAND)
+        self.table_box.Add(self.table_type_box, flag=wx.EXPAND)
+        self.column_box = wx.BoxSizer()
+        self.column_box.Add(self.column_grid, flag=wx.EXPAND)
+        self.create_table_dialog_vbox = wx.BoxSizer(wx.VERTICAL)
+        self.create_table_dialog_vbox.Add(self.column_box, proportion=1, flag=wx.ALL | wx.EXPAND, border=5)
+        self.create_table_dialog_vbox.Add(self.table_box, proportion=0, flag=wx.ALL | wx.EXPAND, border=5)
+        self.create_table_dialog_panel.SetSizer(self.create_table_dialog_vbox)
+        self.column_grid.Bind(wg.EVT_GRID_LABEL_LEFT_CLICK, self.grid_insert_row)
+        self.column_grid.Bind(wg.EVT_GRID_LABEL_RIGHT_CLICK, self.grid_delete_row)
+        self.create_table_button.Bind(wx.EVT_BUTTON, self.create_table_sql)
+        # # test
+        # self.column_grid.SetCellValue(0, 0, 'user_id')
+        # self.column_grid.SetCellValue(0, 1, 'int')
+        # self.column_grid.SetCellValue(0, 2, '用户id')
+        # self.column_grid.SetCellValue(1, 0, 'user_name')
+        # self.column_grid.SetCellValue(1, 1, 'string')
+        # self.column_grid.SetCellValue(2, 0, 'dt')
+        # self.column_grid.SetCellValue(2, 1, 'string')
+        # self.column_grid.SetCellValue(2, 2, '日期')
+        # self.column_grid.SetCellValue(2, 3, '1')
+        # self.table_name_text.SetValue('pdw.dim_user_info')
 
         # 快捷键
         keyboard = wx.AcceleratorTable([(wx.ACCEL_CTRL, ord('f'), self.search_menu.GetId()),
@@ -333,6 +424,49 @@ class SqlFormat(wx.Frame):
 
         self.Show()
 
+    # 表格新增行
+    def grid_insert_row(self, event):
+        self.column_grid.InsertRows(pos=self.column_grid.GetGridCursorRow() + 1, numRows=1, updateLabels=True)
+
+    # 表格删除行
+    def grid_delete_row(self, event):
+        self.column_grid.DeleteRows(pos=self.column_grid.GetGridCursorRow(), numRows=1, updateLabels=True)
+
+    # 生成建表语句
+    def create_table_sql(self, event):
+        if self.table_name_text != "":
+            pass
+        else:
+            exit(1)
+        if self.table_type_text.GetValue() == '外部表':
+            table_type = "external"
+        else:
+            table_type = ""
+        column_sql_list = [[], []]
+        for i in range(self.column_grid.GetNumberCols()):
+            if len(self.column_grid.GetCellValue(i, 0)) > 0:
+                tmp_sql = "`{0}` {1} comment '{2}'".format(self.column_grid.GetCellValue(i, 0),
+                                                           self.column_grid.GetCellValue(i, 1),
+                                                           self.column_grid.GetCellValue(i, 2))
+                if self.column_grid.GetCellValue(i, 3) == '1':
+                    column_sql_list[1].append(tmp_sql)
+                else:
+                    column_sql_list[0].append(tmp_sql)
+        if len(column_sql_list[1]) > 0:
+            partition_sql = "partitioned by ({0})".format(",".join(column_sql_list[1]))
+        else:
+            partition_sql = ""
+        if len(self.table_path_text.GetValue()) > 0:
+            location_sql = "location '{0}'".format(self.table_path_text.GetValue())
+        else:
+            location_sql = ""
+        ct_sql = "create {0} table {1} ({2}) comment '{3}' {4} row format delimited fields terminated by '{5}' " \
+                 "store as {6} {7}".format(table_type, self.table_name_text.GetValue(), ",".join(column_sql_list[0]),
+                                           self.table_comment_text.GetValue(), partition_sql,
+                                           self.table_divide_text.GetValue(), self.table_store_text.GetValue(),
+                                           location_sql)
+        self.sf_panel1.sql_text.SetValue(ct_sql)
+
     # 菜单栏配置
     def menu_event(self, event):
         sf_panel = self.sf_notebook.GetCurrentPage()
@@ -346,7 +480,10 @@ class SqlFormat(wx.Frame):
         elif event_id == self.close_menu.GetId():
             self.notebook_close()
         elif event_id == self.search_menu.GetId():
-            self.find_replace_dialog.Show()
+            self.search_dialog.Show()
+        elif event_id == self.hive_menu.GetId():
+            self.create_table_dialog.Title = 'Hive建表'
+            self.create_table_dialog.Show()
         elif event_id == self.font_menu.GetId():
             font_dlg = wx.FontDialog()
             if font_dlg.ShowModal() == wx.ID_OK:
