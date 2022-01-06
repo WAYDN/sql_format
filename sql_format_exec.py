@@ -37,12 +37,12 @@ def sql_split(sql, is_comma_trans=False, space_num=2):
         is_create = 1
     else:
         split_sql = re.findall(r'(((^(\s*--\s*[^\s]*)+|with.*?\(|\w+\sas\s*\()|'
-                               r'(select|from|((left|right|full|inner|cross)\s(outer\s)?)?join|'
-                               r'on|where|group|order|limit|having|union(\sall)?|insert|create|lateral\sview))'
+                               r'(select|from|((left|right|full|inner|cross)\s(outer\s)?)?join|on|where|group|order|'
+                               r'limit|having|union(\sall)?|insert|create|lateral\sview|distribute\sby))'
                                r'.*?'
                                r'\s(?=(with.*?\(|\w+\sas\s*\()|'
-                               r'(select|from|((left|right|full|inner|cross)\s(outer\s)?)?join\(?|'
-                               r'on|where|group|order|limit|having|union(\sall)?|insert|create|lateral\sview)\s|$))',
+                               r'(select|from|((left|right|full|inner|cross)\s(outer\s)?)?join\(?|on|where|group|order|'
+                               r'limit|having|union(\sall)?|insert|create|lateral\sview|distribute\sby)\s|$))',
                                sql)
     split_sql_list = [split_sql_value[0].lstrip() for split_sql_value in split_sql]
     # 20190319 wq 消除窗口函数中order等字段中含关键字的影响,将select到from或select到union或select整合在一起
@@ -71,6 +71,12 @@ def sql_split(sql, is_comma_trans=False, space_num=2):
         # 分割 sql中的‘字段’和‘逻辑判断条件’；并根据关键字添加空格
         for exec_sql_pos in range(len(exec_sql)):
             exec_sql_value = exec_sql[exec_sql_pos].strip()
+            # 将注释位置调整到段落最后面
+            if re.search('--', exec_sql_value) is not None:
+                tmp_quotes_list = re.findall(r'(--\w*\s*?)', exec_sql_value)
+                for tmp_quotes in tmp_quotes_list:
+                    exec_sql_value = exec_sql_value.replace(tmp_quotes, '')
+                exec_sql_value = exec_sql_value + ' ' + ' '.join(tmp_quotes_list)
             first_value = re.match(r'\s*(--|\w+|\))\s?', exec_sql_value).group(1)
             if first_value in ('select', 'group', 'order') or re.search(r'^create\s.*(?!=select)', exec_sql_value):
                 # 分割字段，根据','分割出所有字段
@@ -173,36 +179,37 @@ def sql_split(sql, is_comma_trans=False, space_num=2):
                 exec_sql[exec_sql_pos] = tmp
             # 20190423 wq 兼容hive关键字：lateral view
             elif first_value == 'lateral':
-                exec_sql[exec_sql_pos] = re.sub(r'^\s*(\w*)\s*', 'lateral ', exec_sql[exec_sql_pos])
+                exec_sql[exec_sql_pos] = re.sub(r'^\s*(\w*)\s*', 'lateral ', exec_sql_value)
             else:
                 if first_value != ')':
-                    if re.search(r'^\w+ as \((\s*--.*)?$', exec_sql[exec_sql_pos]):
-                        exec_sql[exec_sql_pos] = (6 + space_num) * " " + exec_sql[exec_sql_pos]
+                    if re.search(r'^\w+ as \((\s*--.*)?$', exec_sql_value):
+                        exec_sql[exec_sql_pos] = (6 + space_num) * " " + exec_sql_value
                     elif len(first_value) > 6:
                         pass
                     else:
                         exec_sql[exec_sql_pos] = re.sub(r'^\s*(--|\w*)\s*', first_value.rjust(6) + space_num * " ",
-                                                        re.sub(r'\s*\(', ' (', exec_sql[exec_sql_pos]))
+                                                        re.sub(r'\s*\(', ' (', exec_sql_value))
                 else:
-                    # exec_sql[exec_sql_pos] = (6 + space_num) * " " + exec_sql[exec_sql_pos]
+                    # exec_sql[exec_sql_pos] = (6 + space_num) * " " + exec_sql_value
                     pass
         split_sql_list[split_sql_pos] = exec_sql
     return list_remake(split_sql_list)
 
 
-def sql_format(sql, is_comma_trans=False, space_num=2):
+def sql_format(sql, is_comma_trans=False, space_num=2, is_end_semicolon=0):
     """
     将list整合成str，并处理空白字符
     :param sql:string/待处理sql
     :param is_comma_trans: bool/逗号是否前置
     :param space_num: int/关键字后空格个数
+    :param is_end_semicolon: int/末尾分号
     :return: list/处理后的sql及当中所涉及到的表
     """
     level = 0
     result_sql = ''
     # 20190316 wq 修复注释问题，先将注释内容取出,映射到一个随机数，等处理完后最后映射回来
     sql = sql + '\n'
-    notes = list(set([i[0] for i in re.findall(r'(\s*(--.*?(?=\r?\n)|/\*(.|\n)*?\*/))', sql)]))
+    notes = list(set([i[0] for i in re.findall(r'( *(--.*?(?=\r?\n)|/\*(.|\n)*?\*/))', sql)]))
     notes_encode = ['z' + str(random.randint(1000000, 10000000)) + 's' for i in notes]
     for note_pos in range(len(notes)):
         sql = sql.replace(notes[note_pos], '--' + notes_encode[note_pos])
@@ -242,7 +249,7 @@ def sql_format(sql, is_comma_trans=False, space_num=2):
     tmp_sql = tmp_sql.replace('(--', '( --').replace('(select ', '( select ')
     # 20190312 wq 关键字后直接接左括号
     tmp_sql = re.sub(r'((?<=\Wselect)|(?<=\Wfrom)|(?<=\Wjoin)|(?<=\Won)|(?<=\Wover)|(?<=\Wand)|(?<=\Wor)|'
-                     r'(?<=\Wwhere)|(?<=\Wby)|(?<=\Whaving)|(?<=\Was)|(?<=\Win))\(', ' (', tmp_sql)
+                     r'(?<=\Wwhere)|(?<=\Wby)|(?<=\Whaving)|(?<=\Was)|(?<=\Win)|(?<=\Wwhen))\(', ' (', tmp_sql)
 
     table_list = []
     custom_table_list = []
@@ -267,17 +274,17 @@ def sql_format(sql, is_comma_trans=False, space_num=2):
                 # 按括号添加前缀空格，create跳过添加前缀空格
                 if re.search(r'^(\W*)create.*(?!=select)', tmp_sql_value):
                     pass
-                elif re.search(r'\((\s*--\s*[^\s]*)?\s*$', split_sql_value):
+                elif re.search(r'\((\s*--\s*[^\s]*)*\s*$', split_sql_value):
                     level += 1
                 elif re.search(r'^\s*\)\s*.*?,?\s*$', split_sql_value):
                     level -= 1
                 else:
                     pass
-            if re.search(r'^\s*--', tmp_sql_value) and tmp_sql_value == tmp_sql.split(';')[-1]:
+            if re.search(r'^\s*--', tmp_sql_value) or (is_end_semicolon == 0 and tmp_sql_value == tmp_sql.split(';')[-1]):
                 result_sql = result_sql + tmp_result_sql
             else:
                 result_sql = result_sql + re.sub(r'\r\n$', ';\r\n', tmp_result_sql)
-    # 20190423 wq 函数内注释修复：强制插入换行
+    # 注释及引用替换
     for note_pos in range(len(notes_encode)):
         if re.search(notes_encode[note_pos] + "\r?\n", result_sql) is not None:
             pass
@@ -305,12 +312,19 @@ def sql_format(sql, is_comma_trans=False, space_num=2):
 if __name__ == '__main__':
     original_sql = [
         """
-        with asss as (
+        select 123; select 321
+        """,
+        """
+        with --2531
+        asss as --16521
+        (
         select 123 as create_time),
         ssd as (select -123),
         dds as ( --fesfa
         select 3212 as time_union),da as (select 312 as insert_time) --123
-select 1+1, -1-2, 1*-2 , +   +1 regexp_extract(map_col, 'from_sign_id":"([^2]+)"', 1) [1], case when 
+select 1+1, --321
+-1-2, --123
+1*-2 , +   +1, regexp_extract(map_col, 'from_sign_id":"([^2]+)"', 1) [1], case when 
 coalesce(from_object, '') not in ('icon', '') then -12+-25 else -123*-2 end as from_content, count(1) 
 from pdw.fact_stock_em_web_log 
 where hp_stat_date between '2019-11-01' and '2019-11-28' and objects rlike '^(ssbb|neican)_\\d+$' and user_id <> 0 

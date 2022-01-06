@@ -12,7 +12,8 @@ import wx.grid as wg
 
 class SqlFormatPanel(wx.Panel):
     """页卡功能"""
-    def __init__(self, parent, comma_menu, table_menu, space_menu, show_space_menu, wrap_menu, kw_tip_menu):
+    def __init__(self, parent, comma_menu, table_menu, space_menu, show_space_menu, wrap_menu, kw_tip_menu,
+                 end_semicolon):
         super(SqlFormatPanel, self).__init__(parent)
         self.SetBackgroundColour('#F5F5F5')
         self.comma_menu = comma_menu
@@ -21,6 +22,7 @@ class SqlFormatPanel(wx.Panel):
         self.show_space_menu = show_space_menu
         self.wrap_menu = wrap_menu
         self.kw_tip_menu = kw_tip_menu
+        self.show_end_semicolon_menu = end_semicolon
 
         # 文本设置
         self.sql_text = stc.StyledTextCtrl(self, style=wx.TE_MULTILINE | wx.HSCROLL | wx.TE_RICH)
@@ -187,7 +189,11 @@ class SqlFormatPanel(wx.Panel):
                 space_num = 1
             else:
                 space_num = 2
-            result = sql_format_exec.sql_format(source_sql, self.comma_menu.IsChecked(), space_num)
+            if self.show_end_semicolon_menu.IsChecked() == 1:
+                is_end_semicolon = 1
+            else:
+                is_end_semicolon = 0
+            result = sql_format_exec.sql_format(source_sql, self.comma_menu.IsChecked(), space_num, is_end_semicolon)
             result_sql = result[0]
             if self.table_menu.IsChecked() == 1 and result[1] != []:
                 result_sql = result_sql + '\r\n\r\n-- ' + ','.join(result[1])
@@ -246,7 +252,9 @@ class SqlFormat(wx.Frame):
         self.show_space_menu = wx.MenuItem(self.show_menu, 31, "显示空格", kind=wx.ITEM_CHECK)
         self.wrap_menu = wx.MenuItem(self.show_menu, 32, "自动换行", kind=wx.ITEM_CHECK)
         self.kw_tip_menu = wx.MenuItem(self.show_menu, 33, "关键词提示", kind=wx.ITEM_CHECK)
+        self.show_end_semicolon_menu = wx.MenuItem(self.set_menu, 34, "末尾分号", kind=wx.ITEM_CHECK)
         self.show_menu.Append(self.show_space_menu)
+        self.show_menu.Append(self.show_end_semicolon_menu)
         self.show_menu.Append(self.wrap_menu)
         self.show_menu.AppendSeparator()
         self.show_menu.Append(self.kw_tip_menu)
@@ -407,6 +415,7 @@ class SqlFormat(wx.Frame):
             self.comma_menu.Check(int(set_data['comma']))
             self.table_menu.Check(int(set_data['table']))
             self.space_menu.Check(int(set_data['space']))
+            self.show_end_semicolon_menu.Check(int(set_data['end_semicolon']))
             self.show_space_menu.Check(int(set_data['show_space']))
             self.wrap_menu.Check(int(set_data['wrap']))
             self.kw_tip_menu.Check(int(set_data['kw_tip']))
@@ -416,7 +425,8 @@ class SqlFormat(wx.Frame):
         # 页卡
         self.sf_notebook = wx.Notebook(self, style=wx.NB_NOPAGETHEME)
         self.sf_panel1 = SqlFormatPanel(self.sf_notebook, self.comma_menu, self.table_menu, self.space_menu,
-                                        self.show_space_menu, self.wrap_menu, self.kw_tip_menu)
+                                        self.show_space_menu, self.wrap_menu, self.kw_tip_menu,
+                                        self.show_end_semicolon_menu)
         self.sf_notebook.AddPage(self.sf_panel1, 'new 1')
         self.notebook_list = [1]
         # 页卡动作
@@ -494,6 +504,13 @@ class SqlFormat(wx.Frame):
             sf_panel.sql_text.SetViewWhiteSpace(self.show_space_menu.IsChecked())
         elif event_id == self.wrap_menu.GetId():
             sf_panel.sql_text.SetWrapMode(self.wrap_menu.IsChecked())
+        elif event_id == self.show_end_semicolon_menu.GetId():
+            if self.show_end_semicolon_menu.IsChecked() is False:
+                sf_panel.sql_text.SetValue(re.sub(r';(?=\s*$)', '', sf_panel.sql_text.GetValue()))
+            elif re.search(r'.+;\s*$', sf_panel.sql_text.GetValue()):
+                pass
+            else:
+                sf_panel.sql_text.SetValue(re.sub(r'\s*$', '', sf_panel.sql_text.GetValue()) + ';\n')
         self.set_info.set('set_info', 'comma', str(int(self.comma_menu.IsChecked())))
         self.set_info.set('set_info', 'table', str(int(self.table_menu.IsChecked())))
         self.set_info.set('set_info', 'space', str(int(self.space_menu.IsChecked())))
@@ -510,7 +527,7 @@ class SqlFormat(wx.Frame):
     def notebook_new(self):
         self.notebook_list.append(self.notebook_list[-1] + 1)
         sf_panel = SqlFormatPanel(self.sf_notebook, self.comma_menu, self.table_menu, self.space_menu,
-                                  self.show_space_menu, self.wrap_menu, self.kw_tip_menu)
+                                  self.show_space_menu, self.wrap_menu, self.kw_tip_menu, self.show_end_semicolon_menu)
         self.sf_notebook.AddPage(sf_panel, 'new {0}'.format(self.notebook_list[-1]))
         return len(self.notebook_list) - 1
 
@@ -525,7 +542,7 @@ class SqlFormat(wx.Frame):
             sql = save_file.read()
             save_file.close()
             sf_panel = SqlFormatPanel(self.sf_notebook, self.comma_menu, self.table_menu, self.space_menu,
-                                      self.show_space_menu, self.wrap_menu, self.kw_tip_menu)
+                                      self.show_space_menu, self.wrap_menu, self.kw_tip_menu, self.show_end_semicolon_menu)
             sf_panel.sql_text.SetValue(sql)
             self.sf_notebook.AddPage(sf_panel, '{0}'.format(file_open_dialog.Filename))
             self.notebook_list.append(self.notebook_list[-1] + 1)
