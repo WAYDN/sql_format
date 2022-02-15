@@ -229,16 +229,18 @@ def sql_format(sql, is_comma_trans=False, space_num=2, is_end_semicolon=0):
             if pattern_atom in (r'\[', r'\('):
                 rep_str = re.sub(r'\\', '', pattern_atom)
                 pattern = r'(?<=(\w|\(|\[|\)|\]))' + pattern
+            # 后面加空格 ]),
             elif pattern_atom in [r'\]', r'\)', r',']:
                 rep_str = re.sub(r'\\', '', pattern_atom) + ' '
                 pattern = r'(?<=(\w|\(|\[|\)|\]))' + pattern
-            elif pattern_atom in [r'\+', r'\*', '/', '=', '<', '>', '!']:
+            # 前后加空格 =<>!
+            elif pattern_atom in ['=', '<', '>', '!']:
                 rep_str = ' ' + re.sub(r'\\', '', pattern_atom) + ' '
             elif pattern_atom == '-':
                 pattern = '[ ]*(?<!-)-(?!-)[ ]*'
-                rep_str = ' - '
+                rep_str = '-'
             else:
-                rep_str = ''
+                rep_str = re.sub(r'\\', '', pattern_atom)
             tmp_sql = re.sub(pattern, rep_str, tmp_sql)
         # 20190321 wq 优化符号的处理
         tmp_sql = re.sub(r'(?<=[\[\],()])\s*(?=[\[\],()])', '', tmp_sql)
@@ -309,38 +311,12 @@ def sql_format(sql, is_comma_trans=False, space_num=2, is_end_semicolon=0):
     return [result_sql, table_list]
 
 
+# 测试
 if __name__ == '__main__':
     original_sql = [
         """
-        select 123; select 321
-        """,
+        select -123+333; select +321*555; select 561- 55/6; select 1<>2, 1<=2, 1!=2, 2>=1
         """
-        with --2531
-        asss as --16521
-        (
-        select 123 as create_time),
-        ssd as (select -123),
-        dds as ( --fesfa
-        select 3212 as time_union),da as (select 312 as insert_time) --123
-select 1+1, --321
--1-2, --123
-1*-2 , +   +1, regexp_extract(map_col, 'from_sign_id":"([^2]+)"', 1) [1], case when 
-coalesce(from_object, '') not in ('icon', '') then -12+-25 else -123*-2 end as from_content, count(1) 
-from pdw.fact_stock_em_web_log 
-where hp_stat_date between '2019-11-01' and '2019-11-28' and objects rlike '^(ssbb|neican)_\\d+$' and user_id <> 0 
-group by 1
-        """,
-        """   CREATE EXTERNAL TABLE cdm.t_device_user_bind_tags (
-guid string COMMENT '设备id',
-user_id string  COMMENT '账号id',
-tag string  COMMENT '标签',
-is_new int comment '是否最新数据',
-create_time string,
-update_time string
-) comment '设备用户绑定标签表'
- partitioned by (dt string  comment '分区字段')
-  row format delimited fields terminated by '\t' stored as PARQUET TBLPROPERTIES('parquet.compression'='SNAPPY')""",
-        """create table db_test.wq_test as select 123 as ddd, 321 as ds"""
     ]
     for exec_sql_vaule in [original_sql[0]]:
         print(exec_sql_vaule)
