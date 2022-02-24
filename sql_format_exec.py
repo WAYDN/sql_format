@@ -29,7 +29,8 @@ def sql_split(sql, is_comma_trans=False, space_num=2):
     """
     # 分割sql, 结尾加\s 防止将非关键字给分割了 例如pdw_fact_person_insure中的on
     # 20190326 wq 在关键字前后增加\s，防止将非关键字给分割了，例如sql_from中的from
-    if re.search(r'create\s.*(?!=select)', sql):
+    is_create = 0
+    if re.search('create', sql) and not re.search('select', sql):
         split_sql = re.findall(r'((create|partitioned|clustered|sorted by|stored as|into|row format|location)'
                                r'.*?'
                                r'\s(?=(create|partitioned|clustered|sorted by|stored as|into|row format|location)|$))',
@@ -101,7 +102,7 @@ def sql_split(sql, is_comma_trans=False, space_num=2):
                             pass
                 else:
                     tmp_sql = list_remake([re.findall(r'([^(]+\(|(?<=\()[^(]+|[^)]+(?=\))|\)[^)]+)', i)
-                                           if re.search('\(|\)', i) else i for i in tmp_sql])
+                                           if re.search(r'\(|\)', i) else i for i in tmp_sql])
                     # 20210112 wq 合并<>
                     for tmp_sql_pos in range(len(tmp_sql)):
                         if tmp_sql_pos > 0 and tmp_sql[tmp_sql_pos - 1].count('<') != tmp_sql[tmp_sql_pos - 1].count(
@@ -226,21 +227,20 @@ def sql_format(sql, is_comma_trans=False, space_num=2, is_end_semicolon=0):
     if not re.search(r'^(\W*)create ', tmp_sql):
         for pattern_atom in [r'\[', r'\(', r'\]', ',', r'\)', r'\+', '-', r'\*', '/', '=', '<', '>', '!']:
             pattern = '[ ]*{0}[ ]*'.format(pattern_atom)
+            rep_str = re.sub(r'\\', '', pattern_atom)
             if pattern_atom in (r'\[', r'\('):
-                rep_str = re.sub(r'\\', '', pattern_atom)
                 pattern = r'(?<=(\w|\(|\[|\)|\]))' + pattern
             # 后面加空格 ]),
             elif pattern_atom in [r'\]', r'\)', r',']:
-                rep_str = re.sub(r'\\', '', pattern_atom) + ' '
+                rep_str = rep_str + ' '
                 pattern = r'(?<=(\w|\(|\[|\)|\]))' + pattern
             # 前后加空格 =<>!
             elif pattern_atom in ['=', '<', '>', '!']:
-                rep_str = ' ' + re.sub(r'\\', '', pattern_atom) + ' '
+                rep_str = ' ' + rep_str + ' '
             elif pattern_atom == '-':
                 pattern = '[ ]*(?<!-)-(?!-)[ ]*'
-                rep_str = '-'
-            else:
-                rep_str = re.sub(r'\\', '', pattern_atom)
+            elif pattern_atom == r'\*':
+                pattern = '(?<!select)[ ]+\\*[ ]*'
             tmp_sql = re.sub(pattern, rep_str, tmp_sql)
         # 20190321 wq 优化符号的处理
         tmp_sql = re.sub(r'(?<=[\[\],()])\s*(?=[\[\],()])', '', tmp_sql)
@@ -258,9 +258,8 @@ def sql_format(sql, is_comma_trans=False, space_num=2, is_end_semicolon=0):
     for tmp_sql_value in tmp_sql.split(';'):
         tmp_result_sql = ''
         if not re.search(r'^\s*$', tmp_sql_value):
+            # 执行sql切分
             split_sql = sql_split(tmp_sql_value + '\n', is_comma_trans, space_num)
-            # 20190328 wq 获取from后的表，再与with/as的自定义表名对比，剔除
-            # 20190402 wq 1.获取表名：增加join的判断
             for split_sql_value in split_sql:
                 if re.match(r'^\s*(from|((left|right|full|inner|cross)\s+(outer\s+)?)?join)\s+[^(]+$',
                             split_sql_value):
@@ -272,9 +271,12 @@ def sql_format(sql, is_comma_trans=False, space_num=2, is_end_semicolon=0):
                     pass
                 if re.match(r'^\s*$', split_sql_value):
                     continue
+                # 额外的换行
+                if re.search(r'^\s*union\s+all', split_sql_value):
+                    tmp_result_sql = tmp_result_sql + "\r\n"
                 tmp_result_sql = tmp_result_sql + level * 8 * " " + split_sql_value + "\r\n"
                 # 按括号添加前缀空格，create跳过添加前缀空格
-                if re.search(r'^(\W*)create.*(?!=select)', tmp_sql_value):
+                if re.search(r'^(\W*)create.*(?!=select)', split_sql_value):
                     pass
                 elif re.search(r'\((\s*--\s*[^\s]*)*\s*$', split_sql_value):
                     level += 1
@@ -315,7 +317,10 @@ def sql_format(sql, is_comma_trans=False, space_num=2, is_end_semicolon=0):
 if __name__ == '__main__':
     original_sql = [
         """
-        select -123+333; select +321*555; select 561- 55/6; select 1<>2, 1<=2, 1!=2, 2>=1
+        select *,100*-1 from test
+        union all
+        select * from test
+        group by 1, 2, 3, 4
         """
     ]
     for exec_sql_vaule in [original_sql[0]]:
