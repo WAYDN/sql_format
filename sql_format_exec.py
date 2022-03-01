@@ -72,12 +72,6 @@ def sql_split(sql, is_comma_trans=False, space_num=2):
         # 分割 sql中的‘字段’和‘逻辑判断条件’；并根据关键字添加空格
         for exec_sql_pos in range(len(exec_sql)):
             exec_sql_value = exec_sql[exec_sql_pos].strip()
-            # 将注释位置调整到段落最后面
-            if re.search('--', exec_sql_value) is not None:
-                tmp_quotes_list = re.findall(r'(--\w*\s*?)', exec_sql_value)
-                for tmp_quotes in tmp_quotes_list:
-                    exec_sql_value = exec_sql_value.replace(tmp_quotes, '')
-                exec_sql_value = exec_sql_value + ' ' + ' '.join(tmp_quotes_list)
             first_value = re.match(r'\s*(--|\w+|\))\s?', exec_sql_value).group(1)
             if first_value in ('select', 'group', 'order') or re.search(r'^create\s.*(?!=select)', exec_sql_value):
                 # 分割字段，根据','分割出所有字段
@@ -210,7 +204,7 @@ def sql_format(sql, is_comma_trans=False, space_num=2, is_end_semicolon=0):
     result_sql = ''
     # 20190316 wq 修复注释问题，先将注释内容取出,映射到一个随机数，等处理完后最后映射回来
     sql = sql + '\n'
-    notes = list(set([i[0] for i in re.findall(r'( *(--.*?(?=\r?\n)|/\*(.|\n)*?\*/))', sql)]))
+    notes = list(set([i[0] for i in re.findall(r'((--.*?(?=\r?\n)|/\*(.|\n)*?\*/))', sql)]))
     notes_encode = ['z' + str(random.randint(1000000, 10000000)) + 's' for i in notes]
     for note_pos in range(len(notes)):
         sql = sql.replace(notes[note_pos], '--' + notes_encode[note_pos])
@@ -224,7 +218,7 @@ def sql_format(sql, is_comma_trans=False, space_num=2, is_end_semicolon=0):
     # 统一空白符
     sql = ' ' + re.sub(r'\s+', ' ', sql).strip() + ' '
     tmp_sql = sql.lower()
-    if not re.search(r'^(\W*)create ', tmp_sql):
+    if re.search('select', tmp_sql):
         for pattern_atom in [r'\[', r'\(', r'\]', ',', r'\)', r'\+', '-', r'\*', '/', '=', '<', '>', '!']:
             pattern = '[ ]*{0}[ ]*'.format(pattern_atom)
             rep_str = re.sub(r'\\', '', pattern_atom)
@@ -240,7 +234,7 @@ def sql_format(sql, is_comma_trans=False, space_num=2, is_end_semicolon=0):
             elif pattern_atom == '-':
                 pattern = '[ ]*(?<!-)-(?!-)[ ]*'
             elif pattern_atom == r'\*':
-                pattern = '(?<!select)[ ]+\\*[ ]*'
+                pattern = '(?<!select)[ ]+\\*[ ]*(?!from)'
             tmp_sql = re.sub(pattern, rep_str, tmp_sql)
         # 20190321 wq 优化符号的处理
         tmp_sql = re.sub(r'(?<=[\[\],()])\s*(?=[\[\],()])', '', tmp_sql)
@@ -298,7 +292,10 @@ def sql_format(sql, is_comma_trans=False, space_num=2, is_end_semicolon=0):
                 space = ' ' * len(re.search(r'( {6,}.*?)\(.*?--' + notes_encode[note_pos], result_sql).group(1))
             else:
                 space = ''
-            notes[note_pos] = notes[note_pos] + "\r\n" + space
+            if re.search(r'/\*.*\*/', notes[note_pos]) is not None:
+                notes[note_pos] = ' ' * space_num + notes[note_pos]
+            else:
+                notes[note_pos] = ' ' * space_num + notes[note_pos] + '\r\n' + space
     for note_pos in range(len(notes_encode)):
         result_sql = re.sub(r'\s*--\s*' + notes_encode[note_pos], notes[note_pos], result_sql)
     for quotes_pos in range(len(quotes_encode)):
@@ -323,8 +320,8 @@ if __name__ == '__main__':
         group by 1, 2, 3, 4
         """
     ]
-    for exec_sql_vaule in [original_sql[0]]:
-        print(exec_sql_vaule)
+    for exec_sql_ant in [original_sql[0]]:
+        print(exec_sql_ant)
         print("------------------------无情分割线-----------------------")
-        format_sql = sql_format(exec_sql_vaule, False, 2)
+        format_sql = sql_format(exec_sql_ant, False, 2)
         print(format_sql[0])
