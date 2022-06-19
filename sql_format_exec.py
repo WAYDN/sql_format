@@ -204,7 +204,11 @@ def sql_format(sql, is_comma_trans=False, space_num=2, is_end_semicolon=0):
     result_sql = ''
     # 20190316 wq 修复注释问题，先将注释内容取出,映射到一个随机数，等处理完后最后映射回来
     sql = sql + '\n'
-    notes = list(set([i[0] for i in re.findall(r'((--.*?(?=\r?\n)|/\*(.|\n)*?\*/))', sql)]))
+    notes = []
+    for i in re.findall(r'((--.*?(?=\r?\n)|/\*(.|\n)*?\*/))', sql):
+        if i[0] != '--':
+            notes.append(i[0])
+    notes = list(set(notes))
     notes_encode = ['z' + str(random.randint(1000000, 10000000)) + 's' for i in notes]
     for note_pos in range(len(notes)):
         sql = sql.replace(notes[note_pos], '--' + notes_encode[note_pos])
@@ -297,7 +301,7 @@ def sql_format(sql, is_comma_trans=False, space_num=2, is_end_semicolon=0):
             else:
                 notes[note_pos] = ' ' * space_num + notes[note_pos] + '\r\n' + space
     for note_pos in range(len(notes_encode)):
-        result_sql = re.sub(r'\s*--\s*' + notes_encode[note_pos], notes[note_pos], result_sql)
+        result_sql = re.sub(r'\s*--\s*' + notes_encode[note_pos], ' ' + notes[note_pos], result_sql)
     for quotes_pos in range(len(quotes_encode)):
         result_sql = result_sql.replace(quotes_encode[quotes_pos], quotes[quotes_pos])
 
@@ -314,10 +318,10 @@ def sql_format(sql, is_comma_trans=False, space_num=2, is_end_semicolon=0):
 if __name__ == '__main__':
     original_sql = [
         """
-        select *,100*-1 from test
-        union all
-        select * from test
-        group by 1, 2, 3, 4
+        select 1 
+          from test.wq
+        where 1=1 --
+        and 2=2 --test
         """
     ]
     for exec_sql_ant in [original_sql[0]]:

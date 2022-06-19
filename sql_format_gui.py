@@ -2,12 +2,12 @@
 
 import wx
 import wx.stc as stc
-import sql_format_exec
 import re
 import os
 import configparser
 import math
 import wx.grid as wg
+import sql_format_exec
 
 
 class SqlFormatPanel(wx.Panel):
@@ -75,7 +75,7 @@ class SqlFormatPanel(wx.Panel):
         self.sql_text.Bind(wx.EVT_SET_CURSOR, self.get_pos)
 
         # 按钮控件
-        self.button = wx.Button(self, label="格式化", style=wx.Center)
+        self.button = wx.Button(self, label="格式化")
         self.button.SetWindowStyleFlag(wx.NO_BORDER)
         self.button.SetDefault()
         self.button_bc = self.button.GetBackgroundColour()
@@ -525,7 +525,10 @@ class SqlFormat(wx.Frame):
         sf_panel.sql_text.SetWrapMode(self.wrap_menu.IsChecked())
 
     def notebook_new(self):
-        self.notebook_list.append(self.notebook_list[-1] + 1)
+        if len(self.notebook_list) == 0:
+            self.notebook_list.append(1)
+        else:
+            self.notebook_list.append(self.notebook_list[-1] + 1)
         sf_panel = SqlFormatPanel(self.sf_notebook, self.comma_menu, self.table_menu, self.space_menu,
                                   self.show_space_menu, self.wrap_menu, self.kw_tip_menu, self.show_end_semicolon_menu)
         self.sf_notebook.AddPage(sf_panel, 'new {0}'.format(self.notebook_list[-1]))
@@ -592,7 +595,6 @@ class SqlFormat(wx.Frame):
         else:
             max_pos = sql_len
         curr_pos = sf_panel.sql_text.FindText(curr_pos, max_pos, find_object, flags)
-        print(curr_pos)
         if curr_pos == -1 and direction == 1:
             curr_pos = sf_panel.sql_text.FindText(0, sql_len, find_object, flags)
         elif curr_pos == -1 and direction == 0:
