@@ -13,7 +13,7 @@ import sql_format_exec
 class SqlFormatPanel(wx.Panel):
     """页卡功能"""
     def __init__(self, parent, comma_menu, table_menu, space_menu, show_space_menu, wrap_menu, kw_tip_menu,
-                 end_semicolon):
+                 show_end_semicolon_menu):
         super(SqlFormatPanel, self).__init__(parent)
         self.SetBackgroundColour('#F5F5F5')
         self.comma_menu = comma_menu
@@ -22,7 +22,7 @@ class SqlFormatPanel(wx.Panel):
         self.show_space_menu = show_space_menu
         self.wrap_menu = wrap_menu
         self.kw_tip_menu = kw_tip_menu
-        self.show_end_semicolon_menu = end_semicolon
+        self.show_end_semicolon_menu = show_end_semicolon_menu
 
         # 文本设置
         self.sql_text = stc.StyledTextCtrl(self, style=wx.TE_MULTILINE | wx.HSCROLL | wx.TE_RICH)
@@ -415,10 +415,10 @@ class SqlFormat(wx.Frame):
             self.comma_menu.Check(int(set_data['comma']))
             self.table_menu.Check(int(set_data['table']))
             self.space_menu.Check(int(set_data['space']))
-            self.show_end_semicolon_menu.Check(int(set_data['end_semicolon']))
             self.show_space_menu.Check(int(set_data['show_space']))
             self.wrap_menu.Check(int(set_data['wrap']))
             self.kw_tip_menu.Check(int(set_data['kw_tip']))
+            self.show_end_semicolon_menu.Check(int(set_data['end_semicolon']))
         else:
             self.set_info.add_section('set_info')
 
@@ -517,6 +517,7 @@ class SqlFormat(wx.Frame):
         self.set_info.set('set_info', 'show_space', str(int(self.show_space_menu.IsChecked())))
         self.set_info.set('set_info', 'wrap', str(int(self.wrap_menu.IsChecked())))
         self.set_info.set('set_info', 'kw_tip', str(int(self.kw_tip_menu.IsChecked())))
+        self.set_info.set('set_info', 'end_semicolon', str(int(self.show_end_semicolon_menu.IsChecked())))
         self.set_info.write(open('set_info.ini', 'w+', encoding="utf-8"))
 
     def notebook_update(self, event):
@@ -545,7 +546,8 @@ class SqlFormat(wx.Frame):
             sql = save_file.read()
             save_file.close()
             sf_panel = SqlFormatPanel(self.sf_notebook, self.comma_menu, self.table_menu, self.space_menu,
-                                      self.show_space_menu, self.wrap_menu, self.kw_tip_menu, self.show_end_semicolon_menu)
+                                      self.show_space_menu, self.wrap_menu, self.kw_tip_menu,
+                                      self.show_end_semicolon_menu)
             sf_panel.sql_text.SetValue(sql)
             self.sf_notebook.AddPage(sf_panel, '{0}'.format(file_open_dialog.Filename))
             self.notebook_list.append(self.notebook_list[-1] + 1)
