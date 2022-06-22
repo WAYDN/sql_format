@@ -71,7 +71,7 @@ class SqlFormatPanel(wx.Panel):
                    and  (1 = 1 or 2<> 2)
                 ) a
          where  rn = 1
-         union all select col1, col1 from tmp1; select 123
+         union all select col1, col1 from tmp1; select 123;select 12333
          """)
         # 文本动作
         self.sql_text.Bind(stc.EVT_STC_UPDATEUI, self.highlight)

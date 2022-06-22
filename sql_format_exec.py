@@ -318,10 +318,11 @@ def sql_format(sql, is_comma_trans=False, space_num=2, is_end_semicolon=0):
 if __name__ == '__main__':
     original_sql = [
         """
+         with  ddd ( select  123), dddd( select  2131 ),
+         dds2 ( select 321)
+         
         select 1 
           from test.wq
-        where 1=1 --
-        and 2=2 --test
         """
     ]
     for exec_sql_ant in [original_sql[0]]:
