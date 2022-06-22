@@ -37,11 +37,11 @@ def sql_split(sql, is_comma_trans=False, space_num=2):
                                sql)
         is_create = 1
     else:
-        split_sql = re.findall(r'(((^(\s*--\s*[^\s]*)+|with.*?\(|\w+\sas\s*\()|'
+        split_sql = re.findall(r'(((^(\s*--\s*[^\s]*)+|with.*?\(|\w+(\sas)?\s*\((?=\s*select))|'
                                r'(select|from|((left|right|full|inner|cross)\s(outer\s)?)?join|on|where|group|order|'
                                r'limit|having|union(\sall)?|insert|create|lateral\sview|distribute\sby))'
                                r'.*?'
-                               r'\s(?=(with.*?\(|\w+\sas\s*\()|'
+                               r'\s(?=(with.*?\(|\w+(\sas)?\s*\((?=\s*select))|'
                                r'(select|from|((left|right|full|inner|cross)\s(outer\s)?)?join\(?|on|where|group|order|'
                                r'limit|having|union(\sall)?|insert|create|lateral\sview|distribute\sby)\s|$))',
                                sql)
