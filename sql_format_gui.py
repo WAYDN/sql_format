@@ -54,6 +54,9 @@ class SqlFormatPanel(wx.Panel):
         self.sql_text.SetCaretLineVisible(True)
         self.sql_text.SetCaretLineBackground("#F0F8FF")
         self.sql_text.SetValue(u"""
+        with tmp1 (select 123 as col1),
+            tmp2 (
+                select 321 as col1) 
         select  a.user_id as "wq",
                 a.name as `qw`
           from  (
@@ -67,7 +70,8 @@ class SqlFormatPanel(wx.Panel):
                  where  regexp_like(trim(name), '^[\u4E00-\u9FA5]+$')
                    and  (1 = 1 or 2<> 2)
                 ) a
-         where  rn = 1; select 123;select 12333
+         where  rn = 1
+         union all select col1, col1 from tmp1; select 123
          """)
         # 文本动作
         self.sql_text.Bind(stc.EVT_STC_UPDATEUI, self.highlight)
