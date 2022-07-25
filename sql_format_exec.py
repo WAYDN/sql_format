@@ -19,6 +19,17 @@ def list_remake(l):
         return [l]
 
 
+def note_to_end(note_object):
+    """
+    注释后置
+    :param note_object: string
+    :return:
+    """
+    for note_ant in re.findall(r'--z\d+s\s*', note_object):
+        note_object = re.sub(note_ant, '', note_object) + note_ant
+    return note_object
+
+
 def sql_split(sql, is_comma_trans=False, space_num=2):
     """
     用于分割sql，返回list
@@ -140,6 +151,7 @@ def sql_split(sql, is_comma_trans=False, space_num=2):
                         else:
                             case_pos = 0
                             for tmp_case_pos in range(len(tmp_case)):
+                                tmp_case[tmp_case_pos] = note_to_end(tmp_case[tmp_case_pos])
                                 if tmp_case_pos == 0:
                                     case_pos = tmp_case[tmp_case_pos].find('when')
                                 elif re.match('^end', tmp_case[tmp_case_pos]):
@@ -148,7 +160,7 @@ def sql_split(sql, is_comma_trans=False, space_num=2):
                                     tmp_case[tmp_case_pos] = case_pos * ' ' + tmp_case[tmp_case_pos].strip()
                             tmp[tmp_pos] = tmp_case
                     else:
-                        pass
+                        tmp[tmp_pos] = note_to_end(tmp[tmp_pos])
                 exec_sql[exec_sql_pos] = tmp
             elif first_value in ('on', 'where', 'having'):
                 tmp = [i[0] for i in re.findall(r'(\s*(where|on|having|and|or)\s.*?(?=\s(and|or|on|where|having)\s|$))',
@@ -162,6 +174,7 @@ def sql_split(sql, is_comma_trans=False, space_num=2):
                     i += 1
                 bracket_num = 0
                 for tmp_pos in range(len(tmp)):
+                    tmp[tmp_pos] = note_to_end(tmp[tmp_pos])
                     first_value_2 = re.match(r'^\s*(\w*)\s*', tmp[tmp_pos]).group(1)
                     if bracket_num > 0 or space_num == 1:
                         bool_num = 1
@@ -205,10 +218,12 @@ def sql_format(sql, is_comma_trans=False, space_num=2, is_end_semicolon=0):
     # 20190316 wq 修复注释问题，先将注释内容取出,映射到一个随机数，等处理完后最后映射回来
     sql = sql + '\n'
     notes = []
-    for i in re.findall(r'((--.*?(?=\r?\n)|/\*(.|\n)*?\*/))', sql):
+    for i in re.findall(r'(((--.*?\r?\n)*--.*?(?=\r?\n)|/\*(.|\n)*?\*/))', sql):
         if i[0] != '--':
             notes.append(i[0])
     notes = list(set(notes))
+    # 让长注释在前，避免长注释覆盖了短注释的错误
+    notes.sort(key=len, reverse=True)
     notes_encode = ['z' + str(random.randint(1000000, 10000000)) + 's' for i in notes]
     for note_pos in range(len(notes)):
         sql = sql.replace(notes[note_pos], '--' + notes_encode[note_pos])
@@ -259,6 +274,7 @@ def sql_format(sql, is_comma_trans=False, space_num=2, is_end_semicolon=0):
             # 执行sql切分
             split_sql = sql_split(tmp_sql_value + '\n', is_comma_trans, space_num)
             for split_sql_value in split_sql:
+                # 搜索表名
                 if re.match(r'^\s*(from|((left|right|full|inner|cross)\s+(outer\s+)?)?join)\s+[^(]+$',
                             split_sql_value):
                     table_list.append(re.search(r'(from|join)\s+(.+?)(?=--|\s|$)', split_sql_value).group(2))
@@ -318,11 +334,21 @@ def sql_format(sql, is_comma_trans=False, space_num=2, is_end_semicolon=0):
 if __name__ == '__main__':
     original_sql = [
         """
-         with  ddd ( select  123), dddd( select  2131 ),
-         dds2 ( select 321)
-         
-        select 1 
-          from test.wq
+                    select
+                      *,
+--                       case
+--                         when punish_code = 609000 then 1 ---花芝
+--                         when punish_code = 619000 then 2 ---信用代扣
+--                       end as flag_mianmi
+                      case
+                        when substr(punish_code,1,3) in (609) then 1 ---花芝
+                        when substr(punish_code,1,3) in (619) then 2 ---信用代扣
+                      end as flag_mianmi
+                    from
+                      risk_info
+                    where
+--                       punish_code in (619000, 609000) -- and orderType=1
+                         substr(punish_code,1,3) in (619,609)
         """
     ]
     for exec_sql_ant in [original_sql[0]]:
