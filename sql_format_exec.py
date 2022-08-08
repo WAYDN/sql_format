@@ -26,7 +26,7 @@ def note_to_end(note_object):
     :return:
     """
     for note_ant in re.findall(r'--z\d+s\s*', note_object):
-        note_object = re.sub(note_ant, '', note_object) + note_ant
+        note_object = re.sub(note_ant, '', note_object)+note_ant
     return note_object
 
 
@@ -63,7 +63,7 @@ def sql_split(sql, is_comma_trans=False, space_num=2):
     while split_sql_list_pos < len(split_sql_list)-1 and len(split_sql_list) > 1:
         if not re.search('^(from|select|union) ', split_sql_list[split_sql_list_pos+1])\
                 and split_sql_list[split_sql_list_pos].count('(') > split_sql_list[split_sql_list_pos].count(')'):
-            split_sql_list[split_sql_list_pos] = split_sql_list[split_sql_list_pos].strip() + ' ' + \
+            split_sql_list[split_sql_list_pos] = split_sql_list[split_sql_list_pos].strip()+' '+\
                                                  split_sql_list[split_sql_list_pos+1]
             split_sql_list.pop(split_sql_list_pos+1)
         else:
@@ -93,9 +93,9 @@ def sql_split(sql, is_comma_trans=False, space_num=2):
                     # 20190319 wq 合并函数中的括号和中括号
                     for tmp_sql_pos in range(len(tmp_sql)):
                         if tmp_sql_pos > 0 \
-                                and (tmp_sql[tmp_sql_pos - 1].count('(') != tmp_sql[tmp_sql_pos - 1].count(')')
-                                     or tmp_sql[tmp_sql_pos - 1].count('[') != tmp_sql[tmp_sql_pos - 1].count(']')):
-                            tmp_sql[tmp_sql_pos] = tmp_sql[tmp_sql_pos - 1] + ' ' + tmp_sql[tmp_sql_pos]
+                                and (tmp_sql[tmp_sql_pos-1].count('(') != tmp_sql[tmp_sql_pos-1].count(')')
+                                     or tmp_sql[tmp_sql_pos-1].count('[') != tmp_sql[tmp_sql_pos-1].count(']')):
+                            tmp_sql[tmp_sql_pos] = tmp_sql[tmp_sql_pos-1]+' '+tmp_sql[tmp_sql_pos]
                             # 跳过上次括号不齐，留到下次合并处理
                             if tmp_sql[tmp_sql_pos].count('(') == tmp_sql[tmp_sql_pos].count(')') \
                                     and tmp_sql[tmp_sql_pos].count('[') == tmp_sql[tmp_sql_pos].count(']'):
@@ -105,14 +105,25 @@ def sql_split(sql, is_comma_trans=False, space_num=2):
                             tmp.append(tmp_sql[tmp_sql_pos])
                         else:
                             pass
+                    if first_value == 'group':
+                        tmp_group = []
+                        for tmp_pos in range(len(tmp)):
+                            if tmp_pos < len(tmp)-1:
+                                if re.search(r'^\d+,?$', tmp[tmp_pos+1]):
+                                    tmp[tmp_pos+1] = tmp[tmp_pos]+' '+tmp[tmp_pos+1]
+                                else:
+                                    tmp_group.append(tmp[tmp_pos])
+                            else:
+                                tmp_group.append(tmp[tmp_pos])
+                        tmp = tmp_group
                 else:
                     tmp_sql = list_remake([re.findall(r'([^(]+\(|(?<=\()[^(]+|[^)]+(?=\))|\)[^)]+)', i)
                                            if re.search(r'\(|\)', i) else i for i in tmp_sql])
                     # 20210112 wq 合并<>
                     for tmp_sql_pos in range(len(tmp_sql)):
-                        if tmp_sql_pos > 0 and tmp_sql[tmp_sql_pos - 1].count('<') != tmp_sql[tmp_sql_pos - 1].count(
+                        if tmp_sql_pos > 0 and tmp_sql[tmp_sql_pos-1].count('<') != tmp_sql[tmp_sql_pos-1].count(
                                 '>'):
-                            tmp_sql[tmp_sql_pos] = tmp_sql[tmp_sql_pos - 1] + ' ' + tmp_sql[tmp_sql_pos]
+                            tmp_sql[tmp_sql_pos] = tmp_sql[tmp_sql_pos-1]+' '+tmp_sql[tmp_sql_pos]
                             if tmp_sql[tmp_sql_pos].count('<') == tmp_sql[tmp_sql_pos].count('>'):
                                 tmp.append(tmp_sql[tmp_sql_pos].strip())
                         elif tmp_sql[tmp_sql_pos].count('<') == tmp_sql[tmp_sql_pos].count('>'):
@@ -127,11 +138,11 @@ def sql_split(sql, is_comma_trans=False, space_num=2):
                     if tmp_pos == 0:
                         if is_comma_trans is True:
                             tmp[tmp_pos] = re.sub(r',(?=\s*(--z\d+s)?$)', '', tmp[tmp_pos])
-                        tmp[tmp_pos] = re.sub(r'^\s*(\w*)\s*', first_value.rjust(6) + space_num * " ", tmp[tmp_pos])
+                        tmp[tmp_pos] = re.sub(r'^\s*(\w*)\s*', first_value.rjust(6)+space_num*" ", tmp[tmp_pos])
                     else:
                         if is_comma_trans is True and tmp[tmp_pos] != '':
-                            tmp[tmp_pos] = ',' + re.sub(r',(?=\s*(--z\d+s)?$)', '', tmp[tmp_pos])
-                        tmp[tmp_pos] = (6 + space_num) * " " + tmp[tmp_pos]
+                            tmp[tmp_pos] = ','+re.sub(r',(?=\s*(--z\d+s)?$)', '', tmp[tmp_pos])
+                        tmp[tmp_pos] = (6+space_num)*" "+tmp[tmp_pos]
                     # case when 特别处理
                     """
                     20200108 when/else/end 不换行规则
@@ -147,7 +158,7 @@ def sql_split(sql, is_comma_trans=False, space_num=2):
                         if len(tmp_case) < 2:
                             pass
                         elif len(tmp_case) == 2 and re.search(r'^\s*else.*end\W', tmp_case[1]):
-                            tmp[tmp_pos] = tmp_case[0] + ' ' + tmp_case[1].strip()
+                            tmp[tmp_pos] = tmp_case[0]+' '+tmp_case[1].strip()
                         else:
                             case_pos = 0
                             for tmp_case_pos in range(len(tmp_case)):
@@ -155,9 +166,9 @@ def sql_split(sql, is_comma_trans=False, space_num=2):
                                 if tmp_case_pos == 0:
                                     case_pos = tmp_case[tmp_case_pos].find('when')
                                 elif re.match('^end', tmp_case[tmp_case_pos]):
-                                    tmp_case[tmp_case_pos] = (case_pos + 1) * ' ' + tmp_case[tmp_case_pos].strip()
+                                    tmp_case[tmp_case_pos] = (case_pos+1)*' '+tmp_case[tmp_case_pos].strip()
                                 else:
-                                    tmp_case[tmp_case_pos] = case_pos * ' ' + tmp_case[tmp_case_pos].strip()
+                                    tmp_case[tmp_case_pos] = case_pos*' '+tmp_case[tmp_case_pos].strip()
                             tmp[tmp_pos] = tmp_case
                     else:
                         tmp[tmp_pos] = note_to_end(tmp[tmp_pos])
@@ -169,8 +180,8 @@ def sql_split(sql, is_comma_trans=False, space_num=2):
                 i = 0
                 while i < len(tmp):
                     if re.search(r'\sbetween\s', tmp[i]):
-                        tmp[i] = tmp[i] + tmp[i + 1]
-                        del tmp[i + 1]
+                        tmp[i] = tmp[i]+tmp[i+1]
+                        del tmp[i+1]
                     i += 1
                 bracket_num = 0
                 for tmp_pos in range(len(tmp)):
@@ -180,25 +191,25 @@ def sql_split(sql, is_comma_trans=False, space_num=2):
                         bool_num = 1
                     else:
                         bool_num = 2
-                    tmp[tmp_pos] = re.sub(r'^\s*(\w*)\s*', first_value_2.rjust(6 + space_num - bool_num)
-                                          + bool_num * " ", tmp[tmp_pos])
-                    tmp[tmp_pos] = bracket_num * '    ' + tmp[tmp_pos]
-                    bracket_num = bracket_num + tmp[tmp_pos].count('(') - tmp[tmp_pos].count(')')
+                    tmp[tmp_pos] = re.sub(r'^\s*(\w*)\s*', first_value_2.rjust(6+space_num-bool_num)+bool_num*" ",
+                                          tmp[tmp_pos])
+                    tmp[tmp_pos] = bracket_num*'    '+tmp[tmp_pos]
+                    bracket_num = bracket_num+tmp[tmp_pos].count('(')-tmp[tmp_pos].count(')')
                 exec_sql[exec_sql_pos] = tmp
             # 20190423 wq 兼容hive关键字：lateral view
             elif first_value == 'lateral':
                 exec_sql[exec_sql_pos] = re.sub(r'^\s*(\w*)\s*', 'lateral ', exec_sql_value)
             else:
                 if first_value != ')':
-                    if re.search(r'^\w+ as \((\s*--.*)?$', exec_sql_value):
-                        exec_sql[exec_sql_pos] = (6 + space_num) * " " + exec_sql_value
+                    if re.search(r'^\w+(\sas)?\s*\((\s*--.*)?$', exec_sql_value):
+                        exec_sql[exec_sql_pos] = (6+space_num)*" "+exec_sql_value
                     elif len(first_value) > 6:
                         pass
                     else:
-                        exec_sql[exec_sql_pos] = re.sub(r'^\s*(--|\w*)\s*', first_value.rjust(6) + space_num * " ",
+                        exec_sql[exec_sql_pos] = re.sub(r'^\s*(--|\w*)\s*', first_value.rjust(6)+space_num*" ",
                                                         re.sub(r'\s*\(', ' (', exec_sql_value))
                 else:
-                    # exec_sql[exec_sql_pos] = (6 + space_num) * " " + exec_sql_value
+                    # exec_sql[exec_sql_pos] = (6+space_num)*" "+exec_sql_value
                     pass
         split_sql_list[split_sql_pos] = exec_sql
     return list_remake(split_sql_list)
@@ -216,7 +227,7 @@ def sql_format(sql, is_comma_trans=False, space_num=2, is_end_semicolon=0):
     level = 0
     result_sql = ''
     # 20190316 wq 修复注释问题，先将注释内容取出,映射到一个随机数，等处理完后最后映射回来
-    sql = sql + '\n'
+    sql = sql+'\n'
     notes = []
     for i in re.findall(r'(((--.*?\r?\n)*--.*?(?=\r?\n)|/\*(.|\n)*?\*/))', sql):
         if i[0] != '--':
@@ -224,32 +235,32 @@ def sql_format(sql, is_comma_trans=False, space_num=2, is_end_semicolon=0):
     notes = list(set(notes))
     # 让长注释在前，避免长注释覆盖了短注释的错误
     notes.sort(key=len, reverse=True)
-    notes_encode = ['z' + str(random.randint(1000000, 10000000)) + 's' for i in notes]
+    notes_encode = ['z'+str(random.randint(1000000, 10000000))+'s' for i in notes]
     for note_pos in range(len(notes)):
-        sql = sql.replace(notes[note_pos], '--' + notes_encode[note_pos])
+        sql = sql.replace(notes[note_pos], '--'+notes_encode[note_pos])
     # 20190924 wq 引用符中的内容 处理【引用涉及字段引用，因此与注释分开去处理】
     quotes = list(set([i[0] for i in re.findall(r'((\'(.|\n)*?\')|(`(.|\n)*?`)|(\"(.|\n)*?\"))', sql)]))
     # 20200714 wq 消引用符前无空格的情况
-    quotes_encode = [' y' + str(random.randint(1000000, 10000000)) + 'y' for i in quotes]
+    quotes_encode = [' y'+str(random.randint(1000000, 10000000))+'y' for i in quotes]
     for quote_pos in range(len(quotes)):
         sql = sql.replace(quotes[quote_pos], quotes_encode[quote_pos])
         quotes_encode[quote_pos] = quotes_encode[quote_pos].strip()
     # 统一空白符
-    sql = ' ' + re.sub(r'\s+', ' ', sql).strip() + ' '
+    sql = ' '+re.sub(r'\s+', ' ', sql).strip()+' '
     tmp_sql = sql.lower()
     if re.search('select', tmp_sql):
         for pattern_atom in [r'\[', r'\(', r'\]', ',', r'\)', r'\+', '-', r'\*', '/', '=', '<', '>', '!']:
             pattern = '[ ]*{0}[ ]*'.format(pattern_atom)
             rep_str = re.sub(r'\\', '', pattern_atom)
             if pattern_atom in (r'\[', r'\('):
-                pattern = r'(?<=(\w|\(|\[|\)|\]))' + pattern
+                pattern = r'(?<=(\w|\(|\[|\)|\]))'+pattern
             # 后面加空格 ]),
             elif pattern_atom in [r'\]', r'\)', r',']:
-                rep_str = rep_str + ' '
-                pattern = r'(?<=(\w|\(|\[|\)|\]))' + pattern
+                rep_str = rep_str+' '
+                pattern = r'(?<=(\w|\(|\[|\)|\]))'+pattern
             # 前后加空格 =<>!
             elif pattern_atom in ['=', '<', '>', '!']:
-                rep_str = ' ' + rep_str + ' '
+                rep_str = ' '+rep_str+' '
             elif pattern_atom == '-':
                 pattern = '[ ]*(?<!-)-(?!-)[ ]*'
             elif pattern_atom == r'\*':
@@ -258,7 +269,7 @@ def sql_format(sql, is_comma_trans=False, space_num=2, is_end_semicolon=0):
         # 20190321 wq 优化符号的处理
         tmp_sql = re.sub(r'(?<=[\[\],()])\s*(?=[\[\],()])', '', tmp_sql)
         tmp_sql = re.sub(r'(?<=[!=<>])\s*(?=[!=<>])', '', tmp_sql)
-        # 字段中符号开头，例如"100 * -1"
+        # 字段中符号开头，例如"100*-1"
         tmp_sql = re.sub(r'(?<=\D\s[+-])\s*', '', tmp_sql)
     # 20190326 wq 修复子查询的问题
     tmp_sql = tmp_sql.replace('(--', '( --').replace('(select ', '( select ')
@@ -272,7 +283,7 @@ def sql_format(sql, is_comma_trans=False, space_num=2, is_end_semicolon=0):
         tmp_result_sql = ''
         if not re.search(r'^\s*$', tmp_sql_value):
             # 执行sql切分
-            split_sql = sql_split(tmp_sql_value + '\n', is_comma_trans, space_num)
+            split_sql = sql_split(tmp_sql_value+'\n', is_comma_trans, space_num)
             for split_sql_value in split_sql:
                 # 搜索表名
                 if re.match(r'^\s*(from|((left|right|full|inner|cross)\s+(outer\s+)?)?join)\s+[^(]+$',
@@ -287,8 +298,8 @@ def sql_format(sql, is_comma_trans=False, space_num=2, is_end_semicolon=0):
                     continue
                 # 额外的换行
                 if re.search(r'^\s*union\s+all', split_sql_value):
-                    tmp_result_sql = tmp_result_sql + "\r\n"
-                tmp_result_sql = tmp_result_sql + level * 8 * " " + split_sql_value + "\r\n"
+                    tmp_result_sql = tmp_result_sql+"\r\n"
+                tmp_result_sql = tmp_result_sql+level*8*" "+split_sql_value+"\r\n"
                 # 按括号添加前缀空格，create跳过添加前缀空格
                 if re.search(r'^(\W*)create.*(?!=select)', split_sql_value):
                     pass
@@ -299,25 +310,25 @@ def sql_format(sql, is_comma_trans=False, space_num=2, is_end_semicolon=0):
                 else:
                     pass
             if re.search(r'^\s*--', tmp_sql_value) or (is_end_semicolon == 0 and tmp_sql_value == tmp_sql.split(';')[-1]):
-                result_sql = result_sql + tmp_result_sql
+                result_sql = result_sql+tmp_result_sql
             else:
-                result_sql = result_sql + re.sub(r'\r\n$', ';\r\n', tmp_result_sql)
+                result_sql = result_sql+re.sub(r'\r\n$', ';\r\n', tmp_result_sql)
     # 注释及引用替换
     for note_pos in range(len(notes_encode)):
-        if re.search(notes_encode[note_pos] + "\r?\n", result_sql) is not None:
+        if re.search(notes_encode[note_pos]+"\r?\n", result_sql) is not None:
             pass
         else:
             # 20190827 wq 修复字段内的注释
-            if re.search(r'( {6,}.*?)\(.*?--' + notes_encode[note_pos], result_sql) is not None:
-                space = ' ' * len(re.search(r'( {6,}.*?)\(.*?--' + notes_encode[note_pos], result_sql).group(1))
+            if re.search(r'( {6,}.*?)\(.*?--'+notes_encode[note_pos], result_sql) is not None:
+                space = ' '*len(re.search(r'( {6,}.*?)\(.*?--'+notes_encode[note_pos], result_sql).group(1))
             else:
                 space = ''
             if re.search(r'/\*.*\*/', notes[note_pos]) is not None:
-                notes[note_pos] = ' ' * space_num + notes[note_pos]
+                notes[note_pos] = ' '*space_num+notes[note_pos]
             else:
-                notes[note_pos] = ' ' * space_num + notes[note_pos] + '\r\n' + space
+                notes[note_pos] = ' '*space_num+notes[note_pos]+'\r\n'+space
     for note_pos in range(len(notes_encode)):
-        result_sql = re.sub(r'\s*--\s*' + notes_encode[note_pos], ' ' + notes[note_pos], result_sql)
+        result_sql = re.sub(r'\s*--\s*'+notes_encode[note_pos], ' '+notes[note_pos], result_sql)
     for quotes_pos in range(len(quotes_encode)):
         result_sql = result_sql.replace(quotes_encode[quotes_pos], quotes[quotes_pos])
 
@@ -334,21 +345,25 @@ def sql_format(sql, is_comma_trans=False, space_num=2, is_end_semicolon=0):
 if __name__ == '__main__':
     original_sql = [
         """
-                    select
-                      *,
---                       case
---                         when punish_code = 609000 then 1 ---花芝
---                         when punish_code = 619000 then 2 ---信用代扣
---                       end as flag_mianmi
-                      case
-                        when substr(punish_code,1,3) in (609) then 1 ---花芝
-                        when substr(punish_code,1,3) in (619) then 2 ---信用代扣
-                      end as flag_mianmi
-                    from
-                      risk_info
-                    where
---                       punish_code in (619000, 609000) -- and orderType=1
-                         substr(punish_code,1,3) in (619,609)
+        with tmp1 (select 123 as col1),
+            tmp2 (
+                select 321 as col1) 
+        select  a.user_id as "wq",
+                a.name as `qw`
+          from  (
+                -- 测试数据
+                select  user_id,
+                        trim(name) as name,--中文名字
+                        row_number() over (partition by user_id  order by apply_time desc) as rn,
+                        case when 1=1 then endddd else appendas end,
+                        ';' as test
+                  from  test.wq_sql_format_ds
+                 where  regexp_like(trim(name), '^[\u4E00-\u9FA5]+$')
+                   and  (1 = 1 or 2<> 2)
+                ) a
+         where  rn = 1
+         group by 1, 2
+         union all select col1, col1 from tmp1; select 123;select 12333
         """
     ]
     for exec_sql_ant in [original_sql[0]]:
