@@ -19,6 +19,21 @@ def list_remake(l):
         return [l]
 
 
+def count_str_num(obj):
+    """
+    统计对象中非空字符数量
+    :param obj:
+    :return: 非空字符数量
+    """
+    if type(obj) is list:
+        obj = ''.join(list_remake(obj))
+    str_num = len(obj)
+    for i in obj:
+        if ord(i) == ord(' '):
+            str_num -= 1
+    return str_num
+
+
 def note_to_end(note_object):
     """
     注释后置
@@ -201,7 +216,8 @@ def sql_split(sql, is_comma_trans=False, space_num=2):
                 exec_sql[exec_sql_pos] = re.sub(r'^\s*(\w*)\s*', 'lateral ', exec_sql_value)
             else:
                 if first_value != ')':
-                    if re.search(r'^\w+(\sas)?\s*\((\s*--.*)?$', exec_sql_value):
+                    if re.search(r'^\w+(\sas)?\s*\((\s*--.*)?$', exec_sql_value) and \
+                            not re.search(r'(from|((left|right|full|inner|cross)\s(outer\s)?)?join)\s', exec_sql_value):
                         exec_sql[exec_sql_pos] = (6+space_num)*" "+exec_sql_value
                     elif len(first_value) > 6:
                         pass
@@ -280,39 +296,46 @@ def sql_format(sql, is_comma_trans=False, space_num=2, is_end_semicolon=0):
     table_list = []
     custom_table_list = []
     for tmp_sql_value in tmp_sql.split(';'):
+        original_num = count_str_num(tmp_sql_value)
+        change_num = 0
         tmp_result_sql = ''
         if not re.search(r'^\s*$', tmp_sql_value):
             # 执行sql切分
             split_sql = sql_split(tmp_sql_value+'\n', is_comma_trans, space_num)
-            for split_sql_value in split_sql:
-                # 搜索表名
-                if re.match(r'^\s*(from|((left|right|full|inner|cross)\s+(outer\s+)?)?join)\s+[^(]+$',
-                            split_sql_value):
-                    table_list.append(re.search(r'(from|join)\s+(.+?)(?=--|\s|$)', split_sql_value).group(2))
-                elif re.match(r'^\s*\swith.*?\(|[^,]*as\s*\(', split_sql_value):
-                    custom_table_list.append(re.search(r'((?<=with)\s+[^\s]+|[^\s]+(?=\s+as))',
-                                                       split_sql_value).group(1).strip())
-                else:
-                    pass
-                if re.match(r'^\s*$', split_sql_value):
-                    continue
-                # 额外的换行
-                if re.search(r'^\s*union\s+all', split_sql_value):
-                    tmp_result_sql = tmp_result_sql+"\r\n"
-                tmp_result_sql = tmp_result_sql+level*8*" "+split_sql_value+"\r\n"
-                # 按括号添加前缀空格，create跳过添加前缀空格
-                if re.search(r'^(\W*)create.*(?!=select)', split_sql_value):
-                    pass
-                elif re.search(r'\((\s*--\s*[^\s]*)*\s*$', split_sql_value):
-                    level += 1
-                elif re.search(r'^\s*\)\s*.*?,?\s*$', split_sql_value):
-                    level -= 1
-                else:
-                    pass
-            if re.search(r'^\s*--', tmp_sql_value) or (is_end_semicolon == 0 and tmp_sql_value == tmp_sql.split(';')[-1]):
-                result_sql = result_sql+tmp_result_sql
+            change_num = len(split_sql)
+            if original_num != original_num:
+                result_sql = tmp_sql_value
             else:
-                result_sql = result_sql+re.sub(r'\r\n$', ';\r\n', tmp_result_sql)
+                for split_sql_value in split_sql:
+                    # 搜索表名
+                    if re.match(r'^\s*(from|((left|right|full|inner|cross)\s+(outer\s+)?)?join)\s+[^(]+$',
+                                split_sql_value):
+                        table_list.append(re.search(r'(from|join)\s+(.+?)(?=--|\s|$)', split_sql_value).group(2))
+                    elif re.match(r'^\s*\swith.*?\(|[^,]*as\s*\(', split_sql_value):
+                        custom_table_list.append(re.search(r'((?<=with)\s+[^\s]+|[^\s]+(?=\s+as))',
+                                                           split_sql_value).group(1).strip())
+                    else:
+                        pass
+                    if re.match(r'^\s*$', split_sql_value):
+                        continue
+                    # 额外的换行
+                    if re.search(r'^\s*union\s+all', split_sql_value):
+                        tmp_result_sql = tmp_result_sql+"\r\n"
+                    tmp_result_sql = tmp_result_sql+level*8*" "+split_sql_value+"\r\n"
+                    # 按括号添加前缀空格，create跳过添加前缀空格
+                    if re.search(r'^(\W*)create.*(?!=select)', split_sql_value):
+                        pass
+                    elif re.search(r'\((\s*--\s*[^\s]*)*\s*$', split_sql_value):
+                        level += 1
+                    elif re.search(r'^\s*\)\s*.*?,?\s*$', split_sql_value):
+                        level -= 1
+                    else:
+                        pass
+                if re.search(r'^\s*--', tmp_sql_value) \
+                        or (is_end_semicolon == 0 and tmp_sql_value == tmp_sql.split(';')[-1]):
+                    result_sql = result_sql+tmp_result_sql
+                else:
+                    result_sql = result_sql+re.sub(r'\r\n$', ';\r\n', tmp_result_sql)
     # 注释及引用替换
     for note_pos in range(len(notes_encode)):
         if re.search(notes_encode[note_pos]+"\r?\n", result_sql) is not None:
@@ -345,25 +368,20 @@ def sql_format(sql, is_comma_trans=False, space_num=2, is_end_semicolon=0):
 if __name__ == '__main__':
     original_sql = [
         """
-        with tmp1 (select 123 as col1),
-            tmp2 (
-                select 321 as col1) 
-        select  a.user_id as "wq",
-                a.name as `qw`
-          from  (
-                -- 测试数据
-                select  user_id,
-                        trim(name) as name,--中文名字
-                        row_number() over (partition by user_id  order by apply_time desc) as rn,
-                        case when 1=1 then endddd else appendas end,
-                        ';' as test
-                  from  test.wq_sql_format_ds
-                 where  regexp_like(trim(name), '^[\u4E00-\u9FA5]+$')
-                   and  (1 = 1 or 2<> 2)
-                ) a
-         where  rn = 1
-         group by 1, 2
-         union all select col1, col1 from tmp1; select 123;select 12333
+select t1.*, 
+    t2.f_drivingdistance
+from (
+    select order_no, order_use_time, get_on_addr, get_off_addr, order_estimate_km, order_receive_time, driver_no
+    from cc_dw.dwd__order__travel__using_car__ut
+    where dt = 20220903
+    and order_status in (5,6,7)
+) t1 join (
+    select f_orderno, f_drivingdistance, f_driverno, f_drivingduraion
+    from cc_dw.t_dwd_log_dispatcher__log_trace_1d
+    where dt = 20220903
+    and f_driverno is not null
+) t2
+on t1.order_no = t2.f_orderno and t1.driver_no = t2.f_driverno
         """
     ]
     for exec_sql_ant in [original_sql[0]]:
