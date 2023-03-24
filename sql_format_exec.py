@@ -63,11 +63,11 @@ def sql_split(sql, is_comma_trans=False, space_num=2):
                                sql)
         is_create = 1
     else:
-        split_sql = re.findall(r'(((^(\s*--\s*[^\s]*)+|with.*?\(|\w+(\sas)?\s*\((?=\s*select))|'
+        split_sql = re.findall(r'(((^(\s*--\s*[^\s]*)+|with.*?\(|\w+(\sas)?\s*\((\s*--\s*[^\s]*)?(?=\s*select))|'
                                r'(select|from|((left|right|full|inner|cross)\s(outer\s)?)?join|on|where|group|order|'
                                r'limit|having|union(\sall)?|insert|create|lateral\sview|distribute\sby))'
                                r'.*?'
-                               r'\s(?=(with.*?\(|\w+(\sas)?\s*\((?=\s*select))|'
+                               r'\s(?=(with.*?\(|\w+(\sas)?\s*\((\s*--\s*[^\s]*)?(?=\s*select))|'
                                r'(select|from|((left|right|full|inner|cross)\s(outer\s)?)?join\(?|on|where|group|order|'
                                r'limit|having|union(\sall)?|insert|create|lateral\sview|distribute\sby)\s|$))',
                                sql)
@@ -368,20 +368,12 @@ def sql_format(sql, is_comma_trans=False, space_num=2, is_end_semicolon=0):
 if __name__ == '__main__':
     original_sql = [
         """
-select t1.*, 
-    t2.f_drivingdistance
-from (
-    select order_no, order_use_time, get_on_addr, get_off_addr, order_estimate_km, order_receive_time, driver_no
-    from cc_dw.dwd__order__travel__using_car__ut
-    where dt = 20220903
-    and order_status in (5,6,7)
-) t1 join (
-    select f_orderno, f_drivingdistance, f_driverno, f_drivingduraion
-    from cc_dw.t_dwd_log_dispatcher__log_trace_1d
-    where dt = 20220903
-    and f_driverno is not null
-) t2
-on t1.order_no = t2.f_orderno and t1.driver_no = t2.f_driverno
+with tt(select 123),
+bb (
+select 321),
+dd (--ddd
+select 321)
+select 123
         """
     ]
     for exec_sql_ant in [original_sql[0]]:
