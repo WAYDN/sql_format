@@ -55,13 +55,11 @@ def sql_split(sql, is_comma_trans=False, space_num=2):
     """
     # 分割sql, 结尾加\s 防止将非关键字给分割了 例如pdw_fact_person_insure中的on
     # 20190326 wq 在关键字前后增加\s，防止将非关键字给分割了，例如sql_from中的from
-    is_create = 0
-    if re.search('create', sql) and not re.search('select', sql):
+    if re.search('create ', sql) and not re.search('select ', sql):
         split_sql = re.findall(r'((create|partitioned|clustered|sorted by|stored as|into|row format|location)'
                                r'.*?'
                                r'\s(?=(create|partitioned|clustered|sorted by|stored as|into|row format|location)|$))',
                                sql)
-        is_create = 1
     else:
         split_sql = re.findall(r'(((^(\s*--\s*[^\s]*)+|with.*?\(|\w+(\sas)?\s*\((\s*--\s*[^\s]*)?(?=\s*select))|'
                                r'(select|from|((left|right|full|inner|cross)\s(outer\s)?)?join|on|where|group|order|'
@@ -132,7 +130,7 @@ def sql_split(sql, is_comma_trans=False, space_num=2):
                                 tmp_group.append(tmp[tmp_pos])
                         tmp = tmp_group
                 else:
-                    tmp_sql = list_remake([re.findall(r'([^(]+\(|(?<=\()[^(]+|[^)]+(?=\))|\)[^)]+)', i)
+                    tmp_sql = list_remake([re.findall(r'([^(]+\(|(?<=\()[^(]+|[^)]+(?=\))|\)[^)]*)', i)
                                            if re.search(r'\(|\)', i) else i for i in tmp_sql])
                     # 20210112 wq 合并<>
                     for tmp_sql_pos in range(len(tmp_sql)):
@@ -231,12 +229,13 @@ def sql_split(sql, is_comma_trans=False, space_num=2):
     return list_remake(split_sql_list)
 
 
-def sql_format(sql, is_comma_trans=False, space_num=2, is_end_semicolon=0):
+def sql_format(sql, is_comma_trans=False, space_num=2, is_row=False, is_end_semicolon=0):
     """
     将list整合成str，并处理空白字符
     :param sql:string/待处理sql
     :param is_comma_trans: bool/逗号是否前置
     :param space_num: int/关键字后空格个数
+    :param is_row: bool/段前空行
     :param is_end_semicolon: int/末尾分号
     :return: list/处理后的sql及当中所涉及到的表
     """
@@ -319,7 +318,9 @@ def sql_format(sql, is_comma_trans=False, space_num=2, is_end_semicolon=0):
                     if re.match(r'^\s*$', split_sql_value):
                         continue
                     # 额外的换行
-                    if re.search(r'^\s*union\s+all', split_sql_value):
+                    if re.search(r'^\s*union(\s+all)?', split_sql_value) \
+                            or (is_row is True and level == 0 and split_sql_value != split_sql[0]
+                                and re.search(r'^\s*(insert|select|with)', split_sql_value)):
                         tmp_result_sql = tmp_result_sql+"\r\n"
                     tmp_result_sql = tmp_result_sql+level*8*" "+split_sql_value+"\r\n"
                     # 按括号添加前缀空格，create跳过添加前缀空格
