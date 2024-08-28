@@ -298,7 +298,15 @@ def sql_format(sql, is_comma_trans=False, space_num=2, is_row=False, is_end_semi
         original_num = count_str_num(tmp_sql_value)
         change_num = 0
         tmp_result_sql = ''
-        if not re.search(r'^\s*$', tmp_sql_value):
+        if re.search(r'^\s*(--z\d+s\s*)*\s*set', tmp_sql_value):
+            # set解析修复
+            tmp_sql_value = re.sub(r'\s+', ' ', tmp_sql_value).strip()
+            if re.search(r'^\s*(--z\d+s\s*)+', tmp_sql_value):
+                tmp_result_sql = re.search(r'^\s*(--z\d+s\s*)+', tmp_sql_value).group(0) + '\r\n'
+                tmp_sql_value = re.sub(r'^\s*(--z\d+s\s*)+', '', tmp_sql_value).strip()
+            tmp_sql_value = re.sub(r'(?<=set)\s+', ' '*space_num, tmp_sql_value)
+            result_sql = result_sql + tmp_result_sql + ' '*3 + tmp_sql_value + ';\r\n'
+        elif not re.search(r'^\s*$', tmp_sql_value):
             # 执行sql切分
             split_sql = sql_split(tmp_sql_value+'\n', is_comma_trans, space_num)
             change_num = len(split_sql)

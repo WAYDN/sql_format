@@ -1,0 +1,1 @@
+pyinstaller -i=sql_format.ico -w -F sql_format_gui.py --version-file=version_info.txt --clean
