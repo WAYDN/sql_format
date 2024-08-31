@@ -430,7 +430,7 @@ class SqlFormat(wx.Frame):
             self.set_info.add_section('set_info')
 
         # 页卡
-        self.sf_notebook = wa.AuiNotebook(self, style=wa.AUI_NB_CLOSE_ON_ALL_TABS)
+        self.sf_notebook = wa.AuiNotebook(self, style=wa.AUI_NB_CLOSE_ON_ALL_TABS | wa.AUI_NB_WINDOWLIST_BUTTON)
         self.sf_panel1 = SqlFormatPanel(self.sf_notebook, self.comma_menu, self.table_menu, self.space_menu,
                                         self.row_menu, self.show_space_menu, self.wrap_menu, self.kw_tip_menu,
                                         self.show_end_semicolon_menu)
