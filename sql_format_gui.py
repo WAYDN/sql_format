@@ -7,11 +7,12 @@ import os
 import configparser
 import math
 import wx.grid as wg
+import wx.aui as wa
 import sql_format_exec
 
 
 class SqlFormatPanel(wx.Panel):
-    """页卡功能"""
+    """页卡内功能"""
     def __init__(self, parent, comma_menu, table_menu, space_menu, row_menu, show_space_menu, wrap_menu, kw_tip_menu,
                  show_end_semicolon_menu):
         super(SqlFormatPanel, self).__init__(parent)
@@ -229,7 +230,7 @@ class SqlFormat(wx.Frame):
         # 菜单栏-文件
         self.file_menu = wx.Menu()
         self.new_menu = wx.MenuItem(self.file_menu, 11, u"新建", kind=wx.ITEM_NORMAL)
-        self.open_menu = wx.MenuItem(self.file_menu, 12, u"打开(0)", kind=wx.ITEM_NORMAL)
+        self.open_menu = wx.MenuItem(self.file_menu, 12, u"打开(O)", kind=wx.ITEM_NORMAL)
         self.save_menu = wx.MenuItem(self.file_menu, 13, u"保存(S)", kind=wx.ITEM_NORMAL)
         self.close_menu = wx.MenuItem(self.file_menu, 14, u"关闭", kind=wx.ITEM_NORMAL)
         self.search_menu = wx.MenuItem(self.file_menu, 19, u"查找&替换(F)", kind=wx.ITEM_NORMAL)
@@ -397,22 +398,13 @@ class SqlFormat(wx.Frame):
         self.column_grid.Bind(wg.EVT_GRID_LABEL_LEFT_CLICK, self.grid_insert_row)
         self.column_grid.Bind(wg.EVT_GRID_LABEL_RIGHT_CLICK, self.grid_delete_row)
         self.create_table_button.Bind(wx.EVT_BUTTON, self.create_table_sql)
-        # # test
-        # self.column_grid.SetCellValue(0, 0, 'user_id')
-        # self.column_grid.SetCellValue(0, 1, 'int')
-        # self.column_grid.SetCellValue(0, 2, '用户id')
-        # self.column_grid.SetCellValue(1, 0, 'user_name')
-        # self.column_grid.SetCellValue(1, 1, 'string')
-        # self.column_grid.SetCellValue(2, 0, 'dt')
-        # self.column_grid.SetCellValue(2, 1, 'string')
-        # self.column_grid.SetCellValue(2, 2, '日期')
-        # self.column_grid.SetCellValue(2, 3, '1')
-        # self.table_name_text.SetValue('pdw.dim_user_info')
 
         # 快捷键
-        keyboard = wx.AcceleratorTable([(wx.ACCEL_CTRL, ord('f'), self.search_menu.GetId()),
-                                        (wx.ACCEL_CTRL, ord('s'), self.save_menu.GetId()),
-                                        (wx.ACCEL_CTRL, ord('o'), self.open_menu.GetId())])
+        keyboard = wx.AcceleratorTable([
+            (wx.ACCEL_CTRL, ord('o'), self.open_menu.GetId()),
+            (wx.ACCEL_CTRL, ord('s'), self.save_menu.GetId()),
+            (wx.ACCEL_CTRL, ord('f'), self.search_menu.GetId()),
+        ])
         self.SetAcceleratorTable(keyboard)
 
         # 读取预设变量
@@ -420,6 +412,12 @@ class SqlFormat(wx.Frame):
         if os.path.exists('set_info.ini'):
             self.set_info.read('set_info.ini')
             set_data = dict(self.set_info.items('set_info'))
+            # 配置信息校验（ps：如果配置值出现非bool值，需单独设置）
+            for i in ['comma', 'table', 'space', 'row', 'show_space', 'wrap', 'kw_tip', 'end_semicolon']:
+                if i not in set_data.keys():
+                    self.set_info.set('set_info', i, '0')
+                    set_data[i] = '0'
+            self.set_info.write(open('set_info.ini', 'w+'))
             self.comma_menu.Check(int(set_data['comma']))
             self.table_menu.Check(int(set_data['table']))
             self.space_menu.Check(int(set_data['space']))
@@ -432,15 +430,15 @@ class SqlFormat(wx.Frame):
             self.set_info.add_section('set_info')
 
         # 页卡
-        self.sf_notebook = wx.Notebook(self, style=wx.NB_NOPAGETHEME)
+        self.sf_notebook = wa.AuiNotebook(self, style=wa.AUI_NB_CLOSE_ON_ALL_TABS)
         self.sf_panel1 = SqlFormatPanel(self.sf_notebook, self.comma_menu, self.table_menu, self.space_menu,
                                         self.row_menu, self.show_space_menu, self.wrap_menu, self.kw_tip_menu,
                                         self.show_end_semicolon_menu)
         self.sf_notebook.AddPage(self.sf_panel1, 'new 1')
         self.notebook_list = [1]
         # 页卡动作
-        self.sf_notebook.Bind(wx.EVT_NOTEBOOK_PAGE_CHANGED, self.notebook_update)
-
+        self.sf_notebook.Bind(wa.EVT_AUINOTEBOOK_PAGE_CHANGED, self.notebook_update)
+        self.Bind(wa.EVT_AUINOTEBOOK_BG_DCLICK, self.notebook_new, self.sf_notebook)
         self.Show()
 
     # 表格新增行
@@ -491,7 +489,7 @@ class SqlFormat(wx.Frame):
         sf_panel = self.sf_notebook.GetCurrentPage()
         event_id = event.GetId()
         if event_id == self.new_menu.GetId():
-            self.sf_notebook.ChangeSelection(self.notebook_new())
+            self.sf_notebook.ChangeSelection(self.notebook_new(event))
         elif event_id == self.open_menu.GetId():
             self.sf_notebook.ChangeSelection(self.notebook_open())
         elif event_id == self.save_menu.GetId():
@@ -531,12 +529,14 @@ class SqlFormat(wx.Frame):
         self.set_info.set('set_info', 'end_semicolon', str(int(self.show_end_semicolon_menu.IsChecked())))
         self.set_info.write(open('set_info.ini', 'w+'))
 
+    # 获取当前页卡并更新
     def notebook_update(self, event):
         sf_panel = self.sf_notebook.GetCurrentPage()
         sf_panel.sql_text.SetViewWhiteSpace(self.show_space_menu.IsChecked())
         sf_panel.sql_text.SetWrapMode(self.wrap_menu.IsChecked())
 
-    def notebook_new(self):
+    # 新建页卡
+    def notebook_new(self, event):
         if len(self.notebook_list) == 0:
             self.notebook_list.append(1)
         else:
@@ -546,6 +546,7 @@ class SqlFormat(wx.Frame):
         self.sf_notebook.AddPage(sf_panel, 'new {0}'.format(self.notebook_list[-1]))
         return len(self.notebook_list) - 1
 
+    # 已知文件打开页卡
     def notebook_open(self):
         file_open_dialog = wx.FileDialog(self, message="打开", defaultDir=os.getcwd(), wildcard='*.sql',
                                          size=(428, 266), style=wx.FD_OPEN | wx.FD_CHANGE_DIR)
@@ -565,6 +566,7 @@ class SqlFormat(wx.Frame):
         file_open_dialog.Destroy()
         return len(self.notebook_list) - 1
 
+    # 关闭页卡
     def notebook_close(self):
         curr_page_num = self.sf_notebook.GetSelection()
         self.notebook_list.pop(curr_page_num)
@@ -654,4 +656,4 @@ if __name__ == '__main__':
     SqlFormat()
     app.MainLoop()
 
-# pyinstaller -i=sql_format.ico -w -F sql_format_gui.py --version-file=version_info.txt -p S:\\pycode\\sql_format --clean
+
