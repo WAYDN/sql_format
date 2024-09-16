@@ -36,7 +36,6 @@ class SqlFormatPanel(wx.Panel):
         self.sql_text.SetWhitespaceForeground(True, 'Red')
         self.sql_text.SetWhitespaceSize(2)
         self.sql_text.SetWrapMode(self.wrap_menu.IsChecked())
-        self.sql_text_face = self.sql_text.StyleGetFaceName(0)
         # 设置默认配色
         self.sql_text.SetLexer(stc.STC_LEX_SQL)
         # # 清空历史样式
@@ -138,8 +137,7 @@ class SqlFormatPanel(wx.Panel):
                 # 重置标色位置
                 # sql_text.BraceBadLight(current_pos)
                 self.sql_text.BraceHighlight(-1, -1)
-        self.sql_text.StyleSetSpec(stc.STC_STYLE_BRACELIGHT, "fore:#000000,back:#87CEFF,face:{0}".format(
-            self.sql_text_face))
+        self.sql_text.StyleSetSpec(stc.STC_STYLE_BRACELIGHT, "fore:#000000,back:#87CEFF")
 
         # 选择高亮
         select_context = self.sql_text.GetSelectedText()
