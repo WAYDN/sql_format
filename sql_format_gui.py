@@ -16,6 +16,7 @@ class SqlFormatPanel(wx.Panel):
     def __init__(self, parent, comma_menu, table_menu, space_menu, row_menu, show_space_menu, wrap_menu, kw_tip_menu,
                  show_end_semicolon_menu):
         super(SqlFormatPanel, self).__init__(parent)
+        self.last_pos = 0
         self.SetBackgroundColour('#F5F5F5')
         self.comma_menu = comma_menu
         self.table_menu = table_menu
@@ -54,7 +55,8 @@ class SqlFormatPanel(wx.Panel):
         self.sql_text.StyleSetSpec(stc.STC_SQL_IDENTIFIER, "fore:#000000,face:Consolas")
         self.sql_text.SetCaretLineVisible(True)
         self.sql_text.SetCaretLineBackground("#F0F8FF")
-        self.sql_text.SetValue(u"""
+        # self.sql_text.SetValue(u"""-- Ctrl+O：打开文件\n-- Ctrl+S：保存文件\n-- Ctrl+F：查询&替换\n-- Ctrl+Q：行注释""")
+        self.sql_text.SetValue(u"""--Ctrl+Q：行注释
         with tmp1 (select 123 as col1),
             tmp2 (
                 select 321 as col1) 
@@ -111,7 +113,7 @@ class SqlFormatPanel(wx.Panel):
         if len(select_text) > 0:
             select_info = '{0}chars  '.format(len(select_text))
             if select_text.count('\n') > 0:
-                select_info = '{0}lines '.format(select_text.count('\n')) + select_info
+                select_info = '{0}lines '.format(select_text.count('\n') + 1) + select_info
         else:
             select_info = ''
         self.pos_label.SetLabel('{0}{1}:{2}'.format(
@@ -148,42 +150,75 @@ class SqlFormatPanel(wx.Panel):
 
     # 关键词提示
     def keyword_tip(self, event):
-        global last_pos
         if self.kw_tip_menu.IsChecked():
             current_pos = self.sql_text.GetCurrentPos()
             sql_content = self.sql_text.GetValue().encode('utf-8')
             word_start_pos = self.sql_text.WordStartPosition(current_pos, True)
-            current_str = sql_content[word_start_pos:current_pos].decode('utf-8')
-            tmp_kw = ['select', 'from', 'left', 'right', 'full', 'inner', 'join', 'on', 'where', 'group', 'by', 'order',
-                      'limit', 'having', 'union', 'all', 'insert', 'create', 'lateral', 'view', 'with', 'as']
+            current_str = sql_content[word_start_pos:current_pos]
+            base_kw = ['select', 'from', 'left', 'right', 'full', 'inner', 'join', 'on', 'where', 'group', 'by',
+                       'order', 'limit', 'having', 'union', 'all', 'insert', 'create', 'lateral', 'view', 'with', 'as']
+            function_kw = ['avg', 'collect_set', 'collect_list', 'corr', 'count', 'covar_pop', 'covar_samp',
+                           'histogram_numeric', 'max', 'min', 'ntile', 'percentile', 'percentile_approx', 'regr_avgx',
+                           'regr_avgy', 'regr_count', 'regr_intercept', 'regr_r2', 'regr_slope', 'regr_sxx', 'regr_sxy',
+                           'regr_syy', 'stddev_pop', 'stddev_samp', 'sum', 'variance', 'var_pop', 'var_samp',
+                           'cume_dist', 'dense_rank', 'first_value', 'lag', 'last_value', 'lead', 'ntile',
+                           'percent_rank', 'rank', 'row_number', 'array_contains', 'size', 'sort_array', 'array',
+                           'create_union', 'map', 'named_struct', 'struct', 'assert_true', 'coalesce', 'if',
+                           'isnotnull', 'isnull', 'nullif', 'nvl', 'add_months', 'current_timestamp', 'datediff',
+                           'date_add', 'date_format', 'date_sub', 'day', 'dayofmonth', 'extract', 'from_unixtime',
+                           'from_utc_timestamp', 'hour', 'last_day', 'minute', 'month', 'months_between', 'next_day',
+                           'quarter', 'second', 'to_date', 'to_utc_timestamp', 'trunc', 'unix_timestamp', 'weekofyear',
+                           'year', 'abs', 'acos', 'asin', 'atan', 'bin', 'bround', 'cbft', 'ceil', 'ceiling', 'conv',
+                           'cos', 'degrees', 'e', 'exp', 'factorial', 'floor', 'greatest', 'hex', 'least', 'ln', 'log',
+                           'log10', 'log2', 'negative', 'pi', 'pmod', 'positive', 'pow', 'power', 'radians', 'rand',
+                           'round', 'shiftleft', 'shiftright', 'shiftrightunsigned', 'sign', 'sin', 'sqrt', 'tan',
+                           'unhex', 'width_bucket', 'crc32', 'current_database', 'current_user', 'get_json_object',
+                           'hash', 'java_method', 'logged_in_user', 'md5', 'reflect', 'sha', 'sha1', 'sha2', 'version',
+                           'xpath_boolean', 'xpath_double', 'xpath_float', 'xpath_int', 'xpath_long', 'xpath_number',
+                           'xpath_short', 'xpath_string', 'ascii', 'base64', 'chr', 'char_length', 'character_length',
+                           'concat', 'concat_ws', 'decode', 'elt', 'encode', 'field', 'find_in_set', 'format_number',
+                           'get_json_object', 'initcap', 'instr', 'in_file', 'length', 'levenshtein', 'lcase', 'locate',
+                           'lower', 'lpad', 'ltrim', 'octet_length', 'parse_url', 'printf', 'regexp_extract',
+                           'regexp_replace', 'repeat', 'replace', 'reverse', 'rpad', 'rtrim', 'soundex', 'space',
+                           'substr', 'substring', 'substring_index', 'translate', 'trim', 'ucase', 'unbase64', 'upper',
+                           'mask', 'mask_first_n', 'mask_last_n', 'mask_show_first_n', 'mask_show_last_n', 'mask_hash',
+                           'explode', 'inline', 'json_tuple', 'parse_url_tuple', 'posexplode', 'stack', 'binary', 'cast'
+                           ]
+            tmp_kw = []
             kw = []
+            tmp_kw += base_kw
+            tmp_kw += function_kw
             sql_kw = re.findall(r'\w{2,}', self.sql_text.GetValue())
             tmp_kw += sql_kw
             tmp_kw = list(set(tmp_kw))
             key_code = event.GetKeyCode()
-            if key_code in (13, 314, 315, 316, 317):
+            if key_code in (wx.WXK_RETURN, wx.WXK_LEFT, wx.WXK_RIGHT, wx.WXK_UP, wx.WXK_DOWN):
                 # 自动填补时清除历史字符并重新定位光标
-                if key_code == 13 and word_start_pos < last_pos and current_str != '':
-                    self.sql_text.SetValue(sql_content[:word_start_pos] + sql_content[last_pos:])
-                    self.sql_text.GotoPos(current_pos - last_pos + word_start_pos)
-                    # print(current_pos, last_pos, word_start_pos)
+                if key_code == 13 and word_start_pos < self.last_pos and current_str != '':
+                    self.sql_text.SetValue(sql_content[:word_start_pos] + sql_content[self.last_pos:])
+                    self.sql_text.GotoPos(current_pos - self.last_pos + word_start_pos)
                 event.Skip()
             elif current_str != '':
+                try:
+                    current_str = current_str.decode('utf-8')
+                except:
+                    pass
                 for i in tmp_kw:
                     if re.search(current_str, i) and current_str != i:
                         kw.append(i)
                 kw.sort()
-                self.sql_text.AutoCompShow(0, " ".join(kw))
-                # 默认优先选择
-                self.sql_text.AutoCompSelect(current_str)
-                self.sql_text.AutoCompSetAutoHide(True)
-                # 完成匹配后 是否删除后续字符
-                self.sql_text.AutoCompSetDropRestOfWord(True)
+                if len(kw) > 0:
+                    self.sql_text.AutoCompShow(0, " ".join(kw))
+                    # 默认优先选择
+                    self.sql_text.AutoCompSelect(current_str)
+                    self.sql_text.AutoCompSetAutoHide(True)
+                    # 完成匹配后 是否删除后续字符
+                    self.sql_text.AutoCompSetDropRestOfWord(True)
             else:
                 event.Skip()
                 # 当组合键时关闭提示
                 self.sql_text.AutoCompCancel()
-            last_pos = current_pos
+            self.last_pos = current_pos
 
     # 执行格式化
     def exec_format(self, event):
@@ -218,6 +253,7 @@ class SqlFormatPanel(wx.Panel):
 
 class SqlFormat(wx.Frame):
     """主体(菜单栏+页卡+执行按钮)"""
+
     def __init__(self):
         super(SqlFormat, self).__init__(None, title='SQL格式助手', size=(640, 480), style=wx.DEFAULT_FRAME_STYLE)
         self.SetIcon(wx.Icon('sql_format.ico'))
@@ -270,6 +306,10 @@ class SqlFormat(wx.Frame):
         self.create_table_menu = wx.Menu()
         self.hive_menu = wx.MenuItem(self.create_table_menu, 41, "Hive", kind=wx.ITEM_NORMAL)
         self.create_table_menu.Append(self.hive_menu)
+
+        # 菜单栏-自定义
+        self.custom_menu = wx.Menu()
+        self.comment_menu = wx.MenuItem(self.custom_menu, 91, '注释')
 
         # 菜单栏
         self.menu_bar.Append(self.file_menu, title="文件")
@@ -402,8 +442,10 @@ class SqlFormat(wx.Frame):
             (wx.ACCEL_CTRL, ord('o'), self.open_menu.GetId()),
             (wx.ACCEL_CTRL, ord('s'), self.save_menu.GetId()),
             (wx.ACCEL_CTRL, ord('f'), self.search_menu.GetId()),
+            (wx.ACCEL_CTRL, ord('q'), self.comment_menu.GetId()),
         ])
         self.SetAcceleratorTable(keyboard)
+        self.Bind(wx.EVT_MENU, self.add_comment, id=self.comment_menu.GetId())
 
         # 读取预设变量
         self.set_info = configparser.ConfigParser()
@@ -647,6 +689,35 @@ class SqlFormat(wx.Frame):
         if curr_pos != -1:
             sf_panel.sql_text.SetValue(sql_content[:curr_pos] + replace_object + sql_content[curr_pos + find_len:])
             sf_panel.sql_text.SetSelection(curr_pos, curr_pos + replace_len)
+
+    # 注释
+    def add_comment(self, event):
+        sf_panel = self.sf_notebook.GetCurrentPage()
+        curr_pos = sf_panel.sql_text.GetCurrentPos()
+        select_text = sf_panel.sql_text.GetSelectedText().encode('utf-8')
+        tmp_text = sf_panel.sql_text.GetValue().encode('utf-8')
+        if len(select_text) != 0:
+            tmp_select_text = re.findall(r'(^\s+|\S.*(\n\s+)?)(?=(\S|$))', select_text)
+            mdf_select_text = ''
+            for text_ant in tmp_select_text:
+                if re.match(r'^\s*$', text_ant[0]):
+                    mdf_select_text += text_ant[0]
+                elif re.match(r'^--', text_ant[0]):
+                    tmp_text_ant = re.sub(r'--', '', text_ant[0], 1)
+                    mdf_select_text += tmp_text_ant
+                else:
+                    mdf_select_text += '--' + text_ant[0]
+            # 替换
+            ss_pos = sf_panel.sql_text.GetSelectionStart()
+            se_pos = sf_panel.sql_text.GetSelectionEnd()
+            result_text = tmp_text[:ss_pos] + mdf_select_text + tmp_text[se_pos:]
+            sf_panel.sql_text.SetValue(result_text.decode('utf-8'))
+        else:
+            if tmp_text[curr_pos:curr_pos + 2] == '--':
+                sf_panel.sql_text.DeleteRange(curr_pos, 2)
+            else:
+                sf_panel.sql_text.InsertText(curr_pos, '--')
+        sf_panel.sql_text.SetEmptySelection(curr_pos)
 
 
 if __name__ == '__main__':
